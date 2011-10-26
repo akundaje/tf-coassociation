@@ -177,9 +177,7 @@ filter.cols <- function(data) {
                 "HeLaS3SPT20")
   rm.idx <- match(rem.cols, colnames(data))
   rm.idx <- rm.idx[! is.na(rm.idx)]
-  if (length(rm.idx) > 0) {
-    data <- data[, -rm.idx ]
-  }
+  data <- data[, -rm.idx ]
   return(data)
 }
 
@@ -201,9 +199,7 @@ filter.rows <- function(data) {
                 "HeLaS3SPT20")
   rm.idx <- match(rem.rows, rownames(data))
   rm.idx <- rm.idx[! is.na(rm.idx)]
-  if (length(rm.idx) > 0) {
-    data <- data[ -rm.idx , ]  
-  }
+  data <- data[ -rm.idx , ]
   return(data)
 }
 
@@ -521,7 +517,7 @@ make.expr.classf.data <- function(assoc.data,expr.upper=1,expr.lower=1,regress=F
   return(list(x.vals=x.vals,y.vals=y.vals,target.name=assoc.data$target.name))
 }
     
-run.rulefit <- function(assoc.classf.data, mode="class", corr.penalty=3, model.type="both", tree.size=6){
+run.rulefit <- function(assoc.classf.data, mode="class", corr.penalty=3, model.type="both", tree.size=10){
   # ===================================
   # Run Rulefit
   # Returns rulefit object
@@ -1151,10 +1147,10 @@ plot.heatmap <- function(data,
   
   # Compute clustering
 #   orig.clean.data <- clean.data
-#   clean.data[clean.data >= filt.thresh] <- 1
-# #   clean.data[clean.data >= 2*filt.thresh] <- 1
+#   clean.data[clean.data >= filt.thresh] <- 0.5
+#   clean.data[clean.data >= 2*filt.thresh] <- 1
 #   clean.data[clean.data < filt.thresh] <- 0
-# #   clean.data <- clean.data + (pseudo.count * matrix( data=runif(prod(clean.data)), nrow(clean.data), ncol(clean.data) ) )
+#   clean.data <- clean.data + (pseudo.count * matrix( data=runif(prod(clean.data)), nrow(clean.data), ncol(clean.data) ) )
   
   row.cluster.results <- T
   col.cluster.results <- T
@@ -1570,7 +1566,7 @@ plot.average.vi <- function(rulefit.results, output.dir, output.filename=NA, ext
                       )
   
   # Get mean and std of vi
-  val.data <- rulefit.results$mean.vi
+  val.data <-rulefit.results$mean.vi
   val.data <- val.data[val.data$mean.val >= thresh, ]
   if (length(val.data$tf.name) == 0) {return()}
   
