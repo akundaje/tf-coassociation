@@ -64,8 +64,8 @@ for iFile in $(find ${IDIR} -regextype posix-extended -type f -regex ${IREGEX})
     #bsub -M "${MEM}" -R "rusage[mem=${MEM}]" -o ${logFile} -e ${errFile} "Rscript ${SCRIPT_NAME} ${iFile} ${OUTFILE}"
     if [[ ! -e ${OUTFILE} ]]
 	then
-	bsub -q research-rh6 -W 94:00 -M ${MEM} -R "rusage[mem=${MEM}]" -o ${logFile} -e ${errFile} "mkdir ${TMP_DIR} ; Rscript ${SCRIPT_NAME} ${iFile} ${OUTFILE} 0 ${TMP_DIR} ; rm -rf ${TMP_DIR}"
-	#bsub -q research-rh6 -W 94:00 -o ${logFile} -e ${errFile} "mkdir ${TMP_DIR} ; Rscript ${SCRIPT_NAME} ${iFile} ${OUTFILE} 0 ${TMP_DIR} ; rm -rf ${TMP_DIR}"
+	#bsub -q research-rh6 -W 94:00 -M ${MEM} -R "rusage[mem=${MEM}]" -o ${logFile} -e ${errFile} "mkdir ${TMP_DIR} ; Rscript ${SCRIPT_NAME} ${iFile} ${OUTFILE} 0 ${TMP_DIR} ; rm -rf ${TMP_DIR}"
+	bsub -q research-rh6 -W 94:00 -o ${logFile} -e ${errFile} "mkdir ${TMP_DIR} ; Rscript ${SCRIPT_NAME} ${iFile} ${OUTFILE} 0 ${TMP_DIR} ; rm -rf ${TMP_DIR}"
     fi
   done
 done
