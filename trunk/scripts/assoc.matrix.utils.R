@@ -177,7 +177,9 @@ filter.cols <- function(data) {
                 "HeLaS3SPT20")
   rm.idx <- match(rem.cols, colnames(data))
   rm.idx <- rm.idx[! is.na(rm.idx)]
-  data <- data[, -rm.idx ]
+  if (length(rm.idx) > 0) {
+    data <- data[, -rm.idx ]
+  }  
   return(data)
 }
 
@@ -199,7 +201,9 @@ filter.rows <- function(data) {
                 "HeLaS3SPT20")
   rm.idx <- match(rem.rows, rownames(data))
   rm.idx <- rm.idx[! is.na(rm.idx)]
-  data <- data[ -rm.idx , ]
+  if (length(rm.idx) > 0) {
+    data <- data[ -rm.idx , ]  
+  }  
   return(data)
 }
 
@@ -1072,32 +1076,114 @@ plot.heatmap <- function(data,
   if (replace.na) { clean.data[is.na(clean.data)] <- min.val } # set NAs to minimum value
   
   # Generate color breaks
-  temp.min.val <- min.val
-  temp.max.val <- max.val
-  if (! is.na(break.lowerbound)) {  
-    breaks.data <- breaks.data[breaks.data>break.lowerbound] # Remove low values
-    temp.min.val <- break.lowerbound
+  # number of parts to split the color map into (max 3 parts min.val:break.lowerbound , lowerbound:upperbound, upperbound:max.val)
+  if (!is.na(break.lowerbound)) {
+    if (break.lowerbound < min.val) {break.lowerbound <- NA}
   }
-  if (! is.na(break.upperbound)) {  
-    breaks.data <- breaks.data[breaks.data<break.upperbound] # Remove low values
-    temp.max.val <- break.upperbound
-  }   
-  n.breaks <- num.breaks
-  if (break.type == "quantile") {
-    breaks.vals <- quantile(breaks.data,prob=seq(0,1,length.out=n.breaks),na.rm=T)
-    breaks.vals <- c(temp.min.val,breaks.vals,temp.max.val)
-  } else if (break.type == "linear") {
-    breaks.vals <- seq(temp.min.val,temp.max.val,length.out=n.breaks)
+  if (!is.na(break.upperbound)) {
+    if (break.upperbound > max.val) {break.upperbound <- NA}
   }
   
-  #all.colors <- heat.colors(length(breaks.vals)-3)
-  #all.colors <- heatPalette(length(breaks.vals)-3)
-  #all.colors <- rev( divPalette( (length(breaks.vals)-3) , "RdBu" ) )  
-  #all.colors <- rev(focusPalette( (length(breaks.vals)-3) , "redfocus" ))
-  #all.colors <- rampPalette( (length(breaks.vals)-3) , "blue2red" )
-  #all.colors <- rev( redgreen((length(breaks.vals)-3)) )
-  all.colors <- seqPalette( (length(breaks.vals)-3) , "YlOrRd" )
-  all.colors <- ( c(all.colors[1], all.colors, all.colors[length(all.colors)]) )
+  n.breaks <- num.breaks
+  
+  if (is.na(break.lowerbound) && is.na(break.upperbound)) { # Full scale
+    
+    if (break.type == "quantile") {
+      breaks.vals <- quantile(breaks.data,prob=seq(0,1,length.out=n.breaks),na.rm=T)
+      breaks.vals <- c(min.val,breaks.vals,max.val)
+    } else if (break.type == "linear") {
+      breaks.vals <- seq(min.val,max.val,length.out=n.breaks)
+    }
+      
+  } else if (is.na(break.lowerbound) && !is.na(break.upperbound)) {  # min:upper , upper:max    
+    
+    n.1.2 <- round(2*n.breaks/3) # number of break values
+    n.3 <- round(n.breaks/3)
+    if (break.type == "quantile") {
+      # min:upper
+      breaks.vals.1.2 <- quantile( breaks.data[breaks.data<break.upperbound], prob=seq(0,1,length.out=n.1.2), na.rm=T)
+      breaks.vals.1.2 <- c(min.val, breaks.vals.1.2, break.upperbound)
+      #upper:max      
+      breaks.vals.3 <- quantile( breaks.data[breaks.data>=break.upperbound], prob=seq(0,1,length.out=n.3), na.rm=T)
+      breaks.vals.3 <- c(breaks.vals.3, max.val)      
+      breaks.vals <- c(breaks.vals.1.2, breaks.vals.3)
+    } else if (break.type == "linear") {
+      breaks.vals <- c( seq(min.val, break.upperbound, length.out=n.1.2),
+                        seq(break.upperbound, max.val, length.out=n.3))
+    }
+    
+  } else if (!is.na(break.lowerbound) && is.na(break.upperbound)) {
+    
+    n.1 <- round(n.breaks/3) # number of break values
+    n.2.3 <- round(2*n.breaks/3)
+    if (break.type == "quantile") {
+      # min:lower
+      breaks.vals.1 <- quantile( breaks.data[breaks.data<break.lowerbound], prob=seq(0,1,length.out=n.1), na.rm=T)
+      breaks.vals.1 <- c(min.val, breaks.vals.1, break.lowerbound)
+      #lower:max      
+      breaks.vals.2.3 <- quantile( breaks.data[breaks.data>=break.lowerbound], prob=seq(0,1,length.out=n.2.3), na.rm=T)
+      breaks.vals.2.3 <- c(breaks.vals.2.3, max.val)      
+      breaks.vals <- c(breaks.vals.1, breaks.vals.2.3)
+    } else if (break.type == "linear") {
+      breaks.vals <- c( seq(min.val, break.lowerbound, length.out=n.1),
+                        seq(break.lowerbound, max.val, length.out=n.2.3))
+    }    
+    
+  } else {
+    
+    n.1 <- round(n.breaks/3) # number of break values
+    n.2 <- round(n.breaks/3) 
+    n.3 <- round(n.breaks/3) 
+    if (break.type == "quantile") {
+      # min:lower
+      breaks.vals.1 <- quantile( breaks.data[breaks.data<break.lowerbound], prob=seq(0,1,length.out=n.1), na.rm=T)
+      breaks.vals.1 <- c(min.val, breaks.vals.1, break.lowerbound)
+      # lower:upper
+      breaks.vals.2 <- quantile( breaks.data[ (breaks.data>=break.lowerbound) & (breaks.data<break.upperbound)], 
+                                 prob=seq(0,1,length.out=n.2), na.rm=T)
+      breaks.vals.1 <- c(breaks.vals.2, break.upperbound)      
+      # upper:max      
+      breaks.vals.3 <- quantile( breaks.data[breaks.data>=break.upperbound], prob=seq(0,1,length.out=n.3), na.rm=T)
+      breaks.vals.3 <- c(breaks.vals.3, max.val)      
+      breaks.vals <- c(breaks.vals.1, breaks.vals.2, breaks.vals.3)
+    } else if (break.type == "linear") {
+      breaks.vals <- c( seq(min.val, break.lowerbound, length.out=n.1),
+                        seq(break.lowerbound, break.upperbound, length.out=n.2),
+                        seq(break.upperbound, max.val, length.out=n.3))
+    }    
+    
+  }
+
+  all.colors <- seqPalette( (length(breaks.vals)-1) , "YlOrRd" )
+
+  # Old code  
+#   temp.min.val <- min.val
+#   temp.max.val <- max.val
+#   if (! is.na(break.lowerbound)) {  
+#     breaks.data <- breaks.data[breaks.data>break.lowerbound] # Remove low values
+#     temp.min.val <- break.lowerbound
+#   }
+#   if (! is.na(break.upperbound)) {  
+#     breaks.data <- breaks.data[breaks.data<break.upperbound] # Remove low values
+#     temp.max.val <- break.upperbound
+#   }   
+#     
+#   n.breaks <- num.breaks
+#   if (break.type == "quantile") {
+#     breaks.vals <- quantile(breaks.data,prob=seq(0,1,length.out=n.breaks),na.rm=T)
+#     breaks.vals <- c(temp.min.val,breaks.vals,temp.max.val)
+#   } else if (break.type == "linear") {
+#     breaks.vals <- seq(temp.min.val,temp.max.val,length.out=n.breaks)
+#   }
+#   
+#   #all.colors <- heat.colors(length(breaks.vals)-3)
+#   #all.colors <- heatPalette(length(breaks.vals)-3)
+#   #all.colors <- rev( divPalette( (length(breaks.vals)-3) , "RdBu" ) )  
+#   #all.colors <- rev(focusPalette( (length(breaks.vals)-3) , "redfocus" ))
+#   #all.colors <- rampPalette( (length(breaks.vals)-3) , "blue2red" )
+#   #all.colors <- rev( redgreen((length(breaks.vals)-3)) )
+#   all.colors <- seqPalette( (length(breaks.vals)-3) , "YlOrRd" )
+#   all.colors <- ( c(all.colors[1], all.colors, all.colors[length(all.colors)]) )
   
   # Select image size
   if ( !is.null(to.file) ) {
@@ -1857,15 +1943,12 @@ plot.average.pairwise.matrix <- function(rulefit.results, output.dir, output.fil
   }
   
   val.data <- rulefit.results$mean.pairwise.int.matrix
-  #   rownames(val.data) <- gsub("GM12878|K562|HelaS3|Hepg2|H1hesc", "", 
-  #                         toupper( gsub("K562b|Hepg2b", "B-", rownames(val.data)) ), ignore.case=T)    
-  #   colnames(val.data) <- gsub("GM12878|K562|HelaS3|Hepg2|H1hesc", "", 
-  #                         toupper( gsub("K562b|Hepg2b", "B-", colnames(val.data)) ), ignore.case=T)
   val.data <- filter.cols( filter.rows(val.data) )
   rownames(val.data) <- standardize.name(rownames(val.data))
   colnames(val.data) <- standardize.name(colnames(val.data))
   
-  plot.heatmap( data=val.data, show.dendro="none",
+  plot.heatmap( data=val.data, 
+                show.dendro="none",
                 to.file=output.filename,
                 row.title="Transcription Factors",
                 col.title="Transcription Factors",

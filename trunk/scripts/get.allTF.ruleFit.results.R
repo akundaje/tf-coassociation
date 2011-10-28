@@ -235,7 +235,7 @@ if (nrow(global.pairwise.int.matrix) > 0) {
   plot.heatmap(data=global.pairwise.int.matrix,
                show.dendro="none",
                symm.cluster=T,
-               to.file=out.pair.plot,
+               to.file=NULL,
                row.title="Target TFs",
                col.title="Partners of target TF",
                title.name="Global pairwise interactions",
@@ -248,8 +248,8 @@ if (nrow(global.pairwise.int.matrix) > 0) {
                clust.method="ward",
                #dist.metric="spearman",
                break.type="quantile",
-#                break.lowerbound=0.5e-2,
-#                break.upperbound=0.1
+               break.lowerbound=1e-7,
+               break.upperbound=1e-3
                )               
 }
 
