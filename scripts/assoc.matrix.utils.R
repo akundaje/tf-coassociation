@@ -521,7 +521,7 @@ make.expr.classf.data <- function(assoc.data,expr.upper=1,expr.lower=1,regress=F
   return(list(x.vals=x.vals,y.vals=y.vals,target.name=assoc.data$target.name))
 }
     
-run.rulefit <- function(assoc.classf.data, mode="class", corr.penalty=3, model.type="both", tree.size=10){
+run.rulefit <- function(assoc.classf.data, mode="class", corr.penalty=3, model.type="both", tree.size=6){
   # ===================================
   # Run Rulefit
   # Returns rulefit object
