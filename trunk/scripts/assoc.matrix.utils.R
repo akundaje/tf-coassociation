@@ -172,6 +172,7 @@ filter.cols <- function(data) {
                 "K562HEY1",
                 "K562NR4A1",
                 "K562XRCC4",
+                "K562POL2S2",
                 "HepG2HEY1",
                 "HeLaS3GCN5",
                 "HeLaS3SPT20")
@@ -196,6 +197,7 @@ filter.rows <- function(data) {
                 "K562HEY1",
                 "K562NR4A1",
                 "K562XRCC4",
+                "K562POL2S2",
                 "HepG2HEY1",
                 "HeLaS3GCN5",
                 "HeLaS3SPT20")
@@ -225,6 +227,60 @@ get.normal.score <- function(x) {
   # Converts values in x to normal scores (larger values get larger normal scores)
   y <- qnorm( ( rank(x, na.last="keep") - 0.375 ) / ( sum(!is.na(x)) + .25) ) 
   return(y)
+}
+
+plot.peaks.to.nearest.gene.distribution <- function(peak.distance.bed.file, proximal.cutoff=5000, distal.cutoff=50000){
+  # =================================================
+  # plots distribution of distance to nearest gene for all peaks in a dataset
+  # peak.distance.bed.file: BED file containing peak coordinates and coordinates of nearest gene (peak_chr,peak_start,peak_stop,peak_id,tss_chr,tss_start,tss_stop,gene_name,distance)  
+  # proximal.cutoff: distance cutoff for proximal
+  # distal.cutoff: distance cutoff for distal
+  # =================================================
+  
+  require(ggplot2)
+#   peak.distance.bed.file <- "/media/fusion10/work/encode/learning/combinatorics/download/NearestGene/FirstClsstGene_KHHHG/K562/K562bGATA2.dist.bed.gz"
+#   proximal.cutoff=5000 # prox.cutoff: distance cutoff for proximal 
+#   distal.cutoff=50000 # distal.cutoff: distance cutoff for distal
+  
+  output.file <- gsub(pattern="\\.[^/]+$",replacement=".dist2tss.ecdf.png",x=peak.distance.bed.file)
+  target.name <- gsub(pattern=".*/",replacement="",x=peak.distance.bed.file)
+  distance.table <- read.table(file=peak.distance.bed.file,
+                               header=F,
+                               sep="\t",
+                               col.names=c("peak.chr","peak.start","peak.stop","peak.id","tss.chr","tss.start","tss.stop","tss.id","dist"))
+  
+  distance.table$dist <- abs(distance.table$dist) + 1 # Convert 0s to 1
+  distance.cutoff <- data.frame(prox=proximal.cutoff, dist=distal.cutoff)
+  
+  n.proximal <- sum(distance.table$dist <= proximal.cutoff+1,na.rm=T) # number of proximal sites
+  prox.label <- sprintf("%d peaks",n.proximal)                               
+  n.distal <- sum(distance.table$dist > distal.cutoff+1,na.rm=T) # number of distal sites
+  distal.label <- sprintf("%d peaks",n.distal)
+  n.sites <- nrow(distance.table)
+  title.label <- sprintf("%s\n%d peaks", target.name, n.sites)
+
+  temp.ecdf <- ecdf(distance.table$dist)
+  dist.ecdf <- data.frame( x=knots(temp.ecdf), y=temp.ecdf(knots(temp.ecdf)) )
+                               
+  p <- ggplot(dist.ecdf) +
+    geom_area(aes(x=x,y=y), color="orange", fill="orange", alpha=0.5) +
+    geom_vline(data=distance.cutoff, aes(xintercept=prox), linetype=2, color="red") + 
+    #geom_hline(aes(yintercept=temp.ecdf(proximal.cutoff)), linetype=2, color="red") +
+    geom_vline(data=distance.cutoff, aes(xintercept=dist), linetype=2, color="blue") +
+    #geom_hline(aes(yintercept=temp.ecdf(distal.cutoff)), linetype=2, color="blue") +
+    #geom_text(aes(x=proximal.cutoff,y=0.2*n.sites,label=prox.label),color="red",hjust=1, vjust=0) +
+    #geom_text(aes(x=distal.cutoff,y=0.7*n.sites,label=distal.label),color="blue",hjust=0, vjust=0) +    
+    scale_x_log10() + 
+    xlab("Distance from nearest TSS") + 
+    ylab("Empirical CDF") + 
+    theme_bw() +
+    opts(title=title.label,
+         axis.text.x = theme_text(size=14,colour="black"),
+         axis.text.y = theme_text(size=14,colour="black",hjust=1),
+         axis.title.x = theme_text(size=20),
+         axis.title.y = theme_text(size=20,angle=90, vjust=0.3))
+                               
+  ggsave(filename=output.file,plot=p,width=5,height=5,dpi=600)
 }
 
 # =================================================================================================================================
@@ -1203,6 +1259,7 @@ plot.heatmap <- function(data,
   }
   
   # Ajust font sizes
+  #cex.val <- 1
   cex.val <- 0.9
   if (max(data.size) > 50) {
     cex.val <- 0.7
@@ -1663,10 +1720,17 @@ plot.average.vi <- function(rulefit.results, output.dir, output.filename=NA, ext
   val.data$tf.name <- standardize.name(val.data$tf.name)
   
   p1 <- ggplot(val.data) + 
-    geom_bar( aes( x=reorder(tf.name,mean.val) , y=mean.val, fill=mean.val) ) + 
+    #geom_bar( aes( x=reorder(tf.name,mean.val) , y=mean.val, fill=mean.val) ) + 
+    geom_bar( aes( x=reorder(tf.name,mean.val) , y=mean.val), fill="red3", alpha=0.8 ) +
     geom_errorbar( aes( x=reorder(tf.name,mean.val), ymax=hqr, ymin=lqr) )
   axes.labels <- labs(x = "TF", y = "Relative variable importance") # axes labels
-  p1 <- p1 + axes.labels + axes.format + scale_fill_gradient("VarImp") + opts(title=plot.title) + coord_flip()
+  #axes.labels <- labs(x = "", y = "") # axes labels
+  p1 <- p1 + 
+    axes.labels + 
+    axes.format + 
+    #scale_fill_gradient("VarImp") + 
+    opts(title=plot.title) + 
+    coord_flip()
 
   if (nrow(val.data) > 50) {
     p1 <- p1 + opts(axis.text.y = theme_text(size=7,colour="black",hjust=1))
@@ -1947,7 +2011,7 @@ plot.average.pairwise.matrix <- function(rulefit.results, output.dir, output.fil
   rownames(val.data) <- standardize.name(rownames(val.data))
   colnames(val.data) <- standardize.name(colnames(val.data))
   
-  plot.heatmap( data=val.data, 
+  plot.heatmap( data=val.data,
                 show.dendro="none",
                 to.file=output.filename,
                 row.title="Transcription Factors",
@@ -1958,8 +2022,9 @@ plot.average.pairwise.matrix <- function(rulefit.results, output.dir, output.fil
                 logval=F,
                 replace.diag=T,
                 replace.na=T,
-                num.breaks=50,
+                num.breaks=255,
                 clust.method="single",
+                #break.lowerbound=0.5e-3,
                 break.type="quantile")                
 }
 
@@ -2011,6 +2076,97 @@ write.table.average.pairwise.matrix <- function(rulefit.results, output.dir, fil
     }
     count=count+1
   }
+}
+
+compute.proximal.distal.diff.importance <- function(input.dir, 
+                                                    peak.distance.file, 
+                                                    output.filename=NULL,
+                                                    proximal.cutoff=5000,                                                    
+                                                    distal.cutoff=10000) {
+  # Computes differential relative importance for all factors comparing proximal vs. distal sites of the target factor
+
+  # Check that input directory exists
+  if (! file.exists(input.dir)) {
+    stop("Input Directory ", input.dir," does not exist\n")
+  }
+  
+  # Check that peak.distance.file exists
+  if (! file.exists(peak.distance.file)) {
+    stop("Peak2TSS distance file ", peak.distance.file," does not exist\n")
+  }
+  
+  # Autogenerate outputfile name
+  if (is.null(output.filename)) {
+    output.stub <- gsub(pattern="\\.+$",replacement="",x=get.file.parts(peak.distance.file)$name)
+    output.filename <- file.path(input.dir,
+                             sprintf("%s.prox.%d.dist.%d.png", output.stub, proximal.cutoff, distal.cutoff))
+  }
+    
+  # Read and parse distance file, get proximal and distal peak ids
+  distance.table <- read.table(file=peak.distance.file,
+                               header=F,
+                               sep="\t",
+                               col.names=c("peak.chr","peak.start","peak.stop","peak.id","tss.chr","tss.start","tss.stop","tss.id","dist"),
+                               stringsAsFactors=F)
+  proximal.peak.ids <- distance.table$peak.id[distance.table$dist <= proximal.cutoff]
+  distal.peak.ids <- distance.table$peak.id[distance.table$dist > distal.cutoff]
+  
+  # Get list of Rdata files in directory
+  all.Rdata.files <- list.files(path=input.dir, pattern=".*Rdata$", full.names=T) # Get names of Rdata files
+  n.Files <- length(all.Rdata.files)
+  if (n.Files == 0) {
+    stop("No Rdata files found in input directory", input.dir, "\n")
+  }
+  
+  # Load each Rdata file, compute differential importance and store them
+  proximal.vi <- data.frame()
+  distal.vi <- data.frame()
+  for (each.file in all.Rdata.files) {
+    rulefit.results <- restore.rf.model(each.file) # load Rdata.file
+    proximal.rulefit.results <- get.var.imp(rulefit.results,class=proximal.peak.ids)
+    proximal.vi <- rbind(proximal.vi, proximal.rulefit.results$vi)
+    distal.rulefit.results <- get.var.imp(rulefit.results,class=distal.peak.ids)
+    distal.vi <- rbind(distal.vi, distal.rulefit.results$vi)
+  }
+  
+  diff.vi <- distal.vi - proximal.vi
+  median.diff.vi <- apply(diff.vi,2,function(x) median(x,na.rm=T))  
+  lqr.diff.vi <- apply(diff.vi,2,function(x) quantile(x,0.25,na.rm=T))
+  hqr.diff.vi <- apply(diff.vi,2,function(x) quantile(x,0.75,na.rm=T))
+  val.data <- data.frame(mean.val=median.diff.vi,lqr=lqr.diff.vi,hqr=hqr.diff.vi,tf.name=names(median.diff.vi), color.val=(median.diff.vi > 0))
+  
+  rownames(val.data) <- val.data$tf.name
+  val.data <- filter.rows(val.data)
+  val.data$tf.name <- standardize.name(val.data$tf.name)
+  axes.format <- opts(plot.title = theme_text(size=12,vjust=1),                    
+                      axis.text.x = theme_text(size=16,colour="black"),
+                      axis.text.y = theme_text(size=10,colour="black",hjust=1),
+                      axis.title.x = theme_text(size=12),
+                      axis.title.y = theme_text(size=12,angle=90),
+                      legend.position="none",
+                      legend.title = theme_text(size=10,hjust=0),
+                      legend.text = theme_text(size=10)                      
+                      )
+  
+  p1 <- ggplot(val.data) +     
+    geom_bar( aes( x=reorder(tf.name,mean.val) , y=mean.val, fill=color.val), alpha=0.8 ) +
+    geom_errorbar( aes( x=reorder(tf.name,mean.val), ymax=hqr, ymin=lqr) )
+  axes.labels <- labs(x = "TF", y = "Differential importance") # axes labels
+  p1 <- p1 + 
+    axes.labels + 
+    axes.format + 
+    #opts(title=plot.title) +
+    coord_flip()
+  
+  if (nrow(val.data) > 50) {
+    p1 <- p1 + opts(axis.text.y = theme_text(size=7,colour="black",hjust=1))
+  }
+
+  ggsave(file=output.filename, plot=p1, width=6, height=10, dpi=600)    
+  
+  return(list(proximal.vi=proximal.vi,
+              distal.vi=distal.vi,
+              vi.data=val.data))
 }
 
 # =================================================================================================================================
