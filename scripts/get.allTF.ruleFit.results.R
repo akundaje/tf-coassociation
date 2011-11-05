@@ -188,11 +188,11 @@ rownames(all.vi.matrix) <- standardize.name(rownames(all.vi.matrix))
 colnames(all.vi.matrix) <- standardize.name(colnames(all.vi.matrix))
 if (nrow(all.vi.matrix) > 0) {
   plot.heatmap(data=all.vi.matrix,
-               to.file=out.vi.plot,
+               to.file=out.vi.plot,                               
                row.title="Target TF context",
                col.title="TFs",
                title.name="Conditional Partner TF importance",
-               filt.thresh=20,
+               filt.thresh=NA,
                pseudo.count=1e-30,
                logval=F,
                replace.diag=F,
@@ -201,6 +201,7 @@ if (nrow(all.vi.matrix) > 0) {
                clust.method="ward",
                #dist.metric="pearson",
                break.lowerbound=20,
+               break.upperbound=70,                 
                break.type="linear")
 }
 
@@ -232,14 +233,14 @@ rownames(global.pairwise.int.matrix) <- standardize.name(rownames(global.pairwis
 colnames(global.pairwise.int.matrix) <- standardize.name(colnames(global.pairwise.int.matrix))
 
 if (nrow(global.pairwise.int.matrix) > 0) {
-  plot.heatmap(data=global.pairwise.int.matrix,
+  clust.results <- plot.heatmap(data=global.pairwise.int.matrix,
                show.dendro="none",
                symm.cluster=T,
-               to.file=NULL,
+               to.file=out.pair.plot,
                row.title="Target TFs",
                col.title="Partners of target TF",
                title.name="Global pairwise interactions",
-               filt.thresh=1e-4,
+               filt.thresh=1e-7,
                pseudo.count=1e-30,
                logval=F,
                replace.diag=T,
@@ -248,13 +249,34 @@ if (nrow(global.pairwise.int.matrix) > 0) {
                clust.method="ward",
                #dist.metric="spearman",
                break.type="quantile",
-               break.lowerbound=1e-7,
-               break.upperbound=1e-3
+               break.lowerbound=1e-3,
+               #break.upperbound=1e-3
                )               
 }
 
+# plot.heatmap(data=temp.matrix,row.cluster=F,col.cluster=F,
+#                show.dendro="none",
+#                #symm.cluster=T,
+#                to.file="pair.matrix.png",#NULL,#out.pair.plot,
+#                row.title="Target TFs",
+#                col.title="Partners of target TF",
+#                title.name="Global pairwise interactions",
+#                filt.thresh=1e-7,
+#                pseudo.count=1e-30,
+#                logval=F,
+#                replace.diag=T,
+#                replace.na=T,
+#                num.breaks=255,
+#                clust.method="ward",
+#                #dist.metric="spearman",
+#                break.type="quantile",
+#                break.lowerbound=1e-3,
+#                #break.upperbound=1e-3
+#                )
 # Plot accuracy
 require(ggplot2)
+rownames(all.accuracy) <- all.accuracy$target.name
+all.accuracy <- filter.rows(all.accuracy)
 all.accuracy$target.name <- standardize.name(all.accuracy$target.name)
 
 axes.format <- opts(plot.title = theme_text(size=12,vjust=1),                    
