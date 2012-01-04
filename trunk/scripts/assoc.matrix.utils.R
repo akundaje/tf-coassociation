@@ -160,7 +160,7 @@ get.file.parts <- function(file.fullpath) {
 } # end: get.file.parts()
 
 
-filter.cols <- function(data) {
+filter.cols <- function(data,rm.treatments=F) {
   # ===================================
   # Remove specific columns from a data frame
   # ===================================  
@@ -168,6 +168,7 @@ filter.cols <- function(data) {
                 "GM12878STAT1",
                 "GM12878GCN5",
                 "GM12878SPT20",
+                "GM12878NFKBTNFa",
                 "K562BRF2",
                 "K562HEY1",
                 "K562NR4A1",
@@ -175,7 +176,8 @@ filter.cols <- function(data) {
                 "K562POL2S2",
                 "HepG2HEY1",
                 "HeLaS3GCN5",
-                "HeLaS3SPT20")
+                "HeLaS3SPT20",                
+                "expr.val")
   rm.idx <- match(rem.cols, colnames(data))
   rm.idx <- rm.idx[! is.na(rm.idx)]
   if (length(rm.idx) > 0) {
@@ -193,6 +195,7 @@ filter.rows <- function(data) {
                 "GM12878STAT1",
                 "GM12878GCN5",
                 "GM12878SPT20",
+                "GM12878NFKBTNFa",
                 "K562BRF2",
                 "K562HEY1",
                 "K562NR4A1",
@@ -200,7 +203,8 @@ filter.rows <- function(data) {
                 "K562POL2S2",
                 "HepG2HEY1",
                 "HeLaS3GCN5",
-                "HeLaS3SPT20")
+                "HeLaS3SPT20",
+                "expr.val")
   rm.idx <- match(rem.rows, rownames(data))
   rm.idx <- rm.idx[! is.na(rm.idx)]
   if (length(rm.idx) > 0) {
@@ -245,9 +249,10 @@ plot.peaks.to.nearest.gene.distribution <- function(peak.distance.bed.file, prox
   output.file <- gsub(pattern="\\.[^/]+$",replacement=".dist2tss.ecdf.png",x=peak.distance.bed.file)
   target.name <- gsub(pattern=".*/",replacement="",x=peak.distance.bed.file)
   distance.table <- read.table(file=peak.distance.bed.file,
-                               header=F,
+                               header=T,
                                sep="\t",
-                               col.names=c("peak.chr","peak.start","peak.stop","peak.id","tss.chr","tss.start","tss.stop","tss.id","dist"))
+                               #col.names=c("peak.chr","peak.start","peak.stop","peak.id","tss.chr","tss.start","tss.stop","tss.id","dist")
+                               )
   
   distance.table$dist <- abs(distance.table$dist) + 1 # Convert 0s to 1
   distance.cutoff <- data.frame(prox=proximal.cutoff, dist=distal.cutoff)
@@ -554,30 +559,47 @@ make.assoc.classf.posneg.dataset <- function(pos.assoc.data , neg.assoc.data, rm
     target.name=pos.assoc.data$target.name ) )
 }
 
-make.expr.classf.data <- function(assoc.data,expr.upper=1,expr.lower=1,regress=FALSE){
+make.tf.centric.tf.to.expr.dataset <- function(assoc.data,
+                                    peak.distance.expr.bed.file,                                    
+                                    rm.zero.expr=NA){
   # ===================================
-  # Create Expression classification dataset
+  # Create Gene Centric expression dataset
   # ===================================  
-  # assoc.data$assoc.matrix
+  # assoc.data$assoc.matrix (For relaxed peak thresholds, binding values range from 0 to 2. For non-relaxed, range is 0 to 1)
   # assoc.data$target.name
   
-  x.vals <- assoc.data$assoc.matrix
-  y.vals <- x.vals$expr.val
-  x.vals$expr.val <- NULL
-  
-  if (regress==FALSE){
-    grtr.idx <- (y.vals >= expr.upper)
-    lsr.idx <- (y.vals < expr.lower)
-    y.vals[grtr.idx] <- 1
-    y.vals[lsr.idx] <- -1
-  } else {
-    y.vals <- sqrt(y.vals)
+  # Load TF data
+  if (is.character(assoc.data)) {
+    load(assoc.data)    
   }
-    
+
+  # Remove TF peaks for which there is no coassociated TF data
+  x.vals <- filter.cols(assoc.data$assoc.matrix)
+  x.vals <- x.vals[ (apply(x.vals,1,function(x) sum(x,na.rm=T))>0) , ]
+  
+  # Load expression data
+  distance.table <- read.table(file=peak.distance.expr.bed.file,
+                               header=T,
+                               sep="\t",                               
+                             )
+  
+  y.vals <- log2(distance.table$tss.cage+1)
+  names(y.vals) <- as.character(distance.table$peak.id)
+  
+  # Remove zero valued expression data if required
+  if (!is.na(rm.zero.expr)) {
+    y.vals <- y.vals[y.vals>rm.zero.expr]
+  }
+  
+  # Match gene names for expr and tf data
+  common.gene.names <- intersect(names(y.vals),rownames(x.vals))
+  x.vals <- x.vals[ match(common.gene.names,rownames(x.vals)) , ]
+  y.vals <- y.vals[ match(common.gene.names,names(y.vals)) ]
+      
   return(list(x.vals=x.vals,y.vals=y.vals,target.name=assoc.data$target.name))
 }
-    
-run.rulefit <- function(assoc.classf.data, mode="class", corr.penalty=3, model.type="both", tree.size=6){
+
+run.rulefit <- function(assoc.classf.data, mode="class", corr.penalty=3, model.type="both", tree.size=6, test.reps=0){
   # ===================================
   # Run Rulefit
   # Returns rulefit object
@@ -597,8 +619,9 @@ run.rulefit <- function(assoc.classf.data, mode="class", corr.penalty=3, model.t
                    rfmode=mode,
                    #mod.sel=2,
                    max.rules=2000,
-                   tree.size=tree.size
-                   #test.reps=5                  
+                   tree.size=tree.size,
+                   test.reps=test.reps,
+		   quiet=T
                    )  
   return(rfmod)
 }
@@ -618,6 +641,7 @@ run.cv.rulefit <- function(rulefit.results, nfold=10) {
   # Load rulefit.results if input is a data list
   rulefit.results <- restore.rf.model( rulefit.results )  
   rulefit.results$cv = rfxval (nfold=nfold, quiet=T)
+  rulefit.results$cv$lo <- NULL
   if ( any(grepl( pattern="rmse", x=names(rulefit.results$cv), fixed=T)) ) {
     rulefit.results$cv$rsquare <- 1 - ( rulefit.results$cv$rmse^2 / 
       mean((rulefit.results$dataset$y.vals - mean(rulefit.results$dataset$y.vals,na.rm=T))^2 ,na.rm=T) )
@@ -1654,6 +1678,7 @@ get.average.cv <- function(rulefit.results) {
   target.name <- rulefit.results$target.name
 
   # Get mean, std, lqr and hqr of all cross-validation metrics
+  rulefit.results$cv$lo <- NULL
   cv.names <- colnames(rulefit.results$cv)
   mean.val <- apply(rulefit.results$cv, 2, function(x) median(x,na.rm=T)) # get mean of each column
   std.val <- apply(rulefit.results$cv, 2, function(x) sd(x,na.rm=T)) # get std of each column
@@ -2023,8 +2048,9 @@ plot.average.pairwise.matrix <- function(rulefit.results, output.dir, output.fil
                 replace.diag=T,
                 replace.na=T,
                 num.breaks=255,
+                #clust.method="ward",
                 clust.method="single",
-                #break.lowerbound=0.5e-3,
+                break.lowerbound=1e-3,
                 break.type="quantile")                
 }
 
@@ -2104,9 +2130,9 @@ compute.proximal.distal.diff.importance <- function(input.dir,
     
   # Read and parse distance file, get proximal and distal peak ids
   distance.table <- read.table(file=peak.distance.file,
-                               header=F,
+                               header=T,
                                sep="\t",
-                               col.names=c("peak.chr","peak.start","peak.stop","peak.id","tss.chr","tss.start","tss.stop","tss.id","dist"),
+                               #col.names=c("peak.chr","peak.start","peak.stop","peak.id","tss.chr","tss.start","tss.stop","tss.id","dist"),
                                stringsAsFactors=F)
   proximal.peak.ids <- distance.table$peak.id[distance.table$dist <= proximal.cutoff]
   distal.peak.ids <- distance.table$peak.id[distance.table$dist > distal.cutoff]
@@ -2138,6 +2164,7 @@ compute.proximal.distal.diff.importance <- function(input.dir,
   rownames(val.data) <- val.data$tf.name
   val.data <- filter.rows(val.data)
   val.data$tf.name <- standardize.name(val.data$tf.name)
+  require(ggplot2)
   axes.format <- opts(plot.title = theme_text(size=12,vjust=1),                    
                       axis.text.x = theme_text(size=16,colour="black"),
                       axis.text.y = theme_text(size=10,colour="black",hjust=1),
@@ -2166,6 +2193,113 @@ compute.proximal.distal.diff.importance <- function(input.dir,
   
   return(list(proximal.vi=proximal.vi,
               distal.vi=distal.vi,
+              vi.data=val.data))
+}
+
+compute.expr.high.low.diff.importance <- function(input.dir, 
+                                                  peak.distance.expr.file, 
+                                                  output.filename=NULL,
+                                                  dist.cutoff=NA,
+                                                  low.expr.cutoff=1,                                                    
+                                                  high.expr.cutoff=4,
+                                                  rm.zero.expr=T) {
+  # Computes differential relative importance for all factors comparing low vs. high expression genes associated with peaks
+
+  # Check that input directory exists
+  if (! file.exists(input.dir)) {
+    stop("Input Directory ", input.dir," does not exist\n")
+  }
+  
+  # Check that peak.distance.expr.file exists
+  if (! file.exists(peak.distance.expr.file)) {
+    stop("Peak2TSS distance+expression file ", peak.distance.expr.file," does not exist\n")
+  }
+  
+  # Autogenerate outputfile name
+  if (is.null(output.filename)) {
+    output.stub <- gsub(pattern="\\.+$",replacement="",x=get.file.parts(peak.distance.expr.file)$name)
+    output.filename <- file.path(input.dir,
+                             sprintf("%s.nozeros.%d.dist.%d.expr.low.%d.high.%d.png", output.stub, rm.zero.expr, dist.cutoff,low.expr.cutoff, high.expr.cutoff))
+  }
+    
+  # Read and parse distance file, get low and high peak ids
+  distance.table <- read.table(file=peak.distance.expr.file,
+                               header=T,
+                               sep="\t",
+                               #col.names=c("peak.chr","peak.start","peak.stop","peak.id","tss.chr","tss.start","tss.stop","tss.id","dist"),
+                               stringsAsFactors=F)
+  # Remove zero expression
+  if (rm.zero.expr) {
+    distance.table <- droplevels(distance.table[distance.table$tss.cage != 0, ])
+  }
+  # Remove peaks that are beyond the distance cutoff
+  if (!is.na(dist.cutoff)) {
+    cat(sprintf("Number of peaks passing distance cutoff = %d of %d\n",sum(distance.table$dist <= dist.cutoff),length(distance.table$dist)))
+    distance.table <- droplevels(distance.table[distance.table$dist <= dist.cutoff, ])
+  }
+  
+  # Get low expression and high expression peaks
+  low.peak.ids <- distance.table$peak.id[distance.table$tss.cage <= low.expr.cutoff]
+  cat(sprintf("Number of peaks classified as LOW expression = %d\n",length(low.peak.ids)))
+  high.peak.ids <- distance.table$peak.id[distance.table$tss.cage > high.expr.cutoff]
+  cat(sprintf("Number of peaks classified as HIGH expression = %d\n",length(high.peak.ids)))
+  
+  # Get list of Rdata files in directory
+  all.Rdata.files <- list.files(path=input.dir, pattern=".*Rdata$", full.names=T) # Get names of Rdata files
+  n.Files <- length(all.Rdata.files)
+  if (n.Files == 0) {
+    stop("No Rdata files found in input directory", input.dir, "\n")
+  }
+  
+  # Load each Rdata file, compute differential importance and store them
+  low.vi <- data.frame()
+  high.vi <- data.frame()
+  for (each.file in all.Rdata.files) {
+    rulefit.results <- restore.rf.model(each.file) # load Rdata.file
+    low.rulefit.results <- get.var.imp(rulefit.results,class=low.peak.ids)
+    low.vi <- rbind(low.vi, low.rulefit.results$vi)
+    high.rulefit.results <- get.var.imp(rulefit.results,class=high.peak.ids)
+    high.vi <- rbind(high.vi, high.rulefit.results$vi)
+  }
+  
+  diff.vi <- high.vi - low.vi
+  median.diff.vi <- apply(diff.vi,2,function(x) median(x,na.rm=T))  
+  lqr.diff.vi <- apply(diff.vi,2,function(x) quantile(x,0.25,na.rm=T))
+  hqr.diff.vi <- apply(diff.vi,2,function(x) quantile(x,0.75,na.rm=T))
+  val.data <- data.frame(mean.val=median.diff.vi,lqr=lqr.diff.vi,hqr=hqr.diff.vi,tf.name=names(median.diff.vi), color.val=(median.diff.vi > 0))
+  
+  rownames(val.data) <- val.data$tf.name
+  val.data <- filter.rows(val.data)
+  val.data$tf.name <- standardize.name(val.data$tf.name)
+  require(ggplot2)
+  axes.format <- opts(plot.title = theme_text(size=12,vjust=1),                    
+                      axis.text.x = theme_text(size=16,colour="black"),
+                      axis.text.y = theme_text(size=10,colour="black",hjust=1),
+                      axis.title.x = theme_text(size=12),
+                      axis.title.y = theme_text(size=12,angle=90),
+                      legend.position="none",
+                      legend.title = theme_text(size=10,hjust=0),
+                      legend.text = theme_text(size=10)                      
+                      )
+  
+  p1 <- ggplot(val.data) +     
+    geom_bar( aes( x=reorder(tf.name,mean.val) , y=mean.val, fill=color.val), alpha=0.8 ) +
+    geom_errorbar( aes( x=reorder(tf.name,mean.val), ymax=hqr, ymin=lqr) )
+  axes.labels <- labs(x = "TF", y = "Differential importance") # axes labels
+  p1 <- p1 + 
+    axes.labels + 
+    axes.format + 
+    #opts(title=plot.title) +
+    coord_flip()
+  
+  if (nrow(val.data) > 50) {
+    p1 <- p1 + opts(axis.text.y = theme_text(size=7,colour="black",hjust=1))
+  }
+
+  ggsave(file=output.filename, plot=p1, width=6, height=10, dpi=600)    
+  
+  return(list(low.vi=low.vi,
+              high.vi=high.vi,
               vi.data=val.data))
 }
 
@@ -2253,6 +2387,7 @@ consolidate.expression.data <- function( expr.file, pseudo.count=1e-3 ) {
   expr <- expr + min.val
   expr[is.na(expr)] <- min.val
   expr <- log2(expr)
+#   expr <- log2(expr+1)
   
   expr.colnames <- colnames(expr)
   expr.colnames <- gsub( "rep[1-9]+" , "rep0", expr.colnames )
@@ -2271,6 +2406,75 @@ consolidate.expression.data <- function( expr.file, pseudo.count=1e-3 ) {
     }          
   }
   return(final.expr)  
+}
+
+# old.make.expr.classf.data <- function(assoc.data,expr.upper=1,expr.lower=1,regress=FALSE){
+#   # ===================================
+#   # Create Expression classification dataset
+#   # ===================================  
+#   # assoc.data$assoc.matrix
+#   # assoc.data$target.name
+#   
+#   x.vals <- assoc.data$assoc.matrix
+#   y.vals <- x.vals$expr.val
+#   x.vals$expr.val <- NULL
+#   
+#   if (regress==FALSE){
+#     grtr.idx <- (y.vals >= expr.upper)
+#     lsr.idx <- (y.vals < expr.lower)
+#     y.vals[grtr.idx] <- 1
+#     y.vals[lsr.idx] <- -1
+#   } else {
+#     y.vals <- sqrt(y.vals)
+#   }
+#     
+#   return(list(x.vals=x.vals,y.vals=y.vals,target.name=assoc.data$target.name))
+# }
+
+make.gene.centric.tf.to.expr.dataset <- function(assoc.data,
+                                    expr,
+                                    filter.expr=c("Cy","plus","Cage"),
+                                    rm.zero.expr=NA){
+  # ===================================
+  # Create Gene Centric expression dataset
+  # ===================================  
+  # assoc.data$assoc.matrix (For relaxed peak thresholds, binding values range from 0 to 2. For non-relaxed, range is 0 to 1)
+  # assoc.data$target.name
+  
+  # Load TF data
+  if (is.character(assoc.data)) {
+    load(assoc.data)    
+  }
+
+  # Remove genes for which there is no TF data
+  x.vals <- assoc.data$assoc.matrix
+  x.vals <- x.vals[ (apply(x.vals,1,function(x) sum(x,na.rm=T))>0) , ]
+  
+  # Load expression data
+  if (is.character(expr)) {
+    load(expr)    
+  }
+  
+  # Get specific expression data type
+  expr.types <- colnames(expr)
+#   filter.expr <- c("Cy","plus","Cage")
+  for (i in filter.expr) {
+    expr.types <- expr.types[grep(i,expr.types,ignore.case=T)]
+  }
+  y.vals <- expr[,expr.types]
+  names(y.vals) <- rownames(expr)
+  
+  # Remove zero valued expression data if required
+  if (!is.na(rm.zero.expr)) {
+    y.vals <- y.vals[y.vals>rm.zero.expr]
+  }
+  
+  # Match gene names for expr and tf data
+  common.gene.names <- intersect(names(y.vals),rownames(x.vals))
+  x.vals <- x.vals[ match(common.gene.names,rownames(x.vals)) , ]
+  y.vals <- y.vals[ match(common.gene.names,names(y.vals)) ]
+      
+  return(list(x.vals=x.vals,y.vals=y.vals,target.name=assoc.data$target.name))
 }
 
 # =================================================================================================================================
