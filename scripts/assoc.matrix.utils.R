@@ -294,7 +294,7 @@ plot.peaks.to.nearest.gene.distribution <- function(peak.distance.bed.file, prox
 # =================================================================================================================================
 # =================================================================================================================================
 
-read.assoc.file <- function( assoc.file, std.thresh=NA ) {
+read.assoc.file <- function( assoc.file, std.thresh=NA, use.relaxed=T ) {
   # ===================================
   # Parses and reads an association table (needs to have headers for each column)
   #   First column MUST be 'PeakID' representing peakids of the form [TargetName]_Pk_[peakId]_[overlapType]
@@ -306,9 +306,10 @@ read.assoc.file <- function( assoc.file, std.thresh=NA ) {
   # ===================================  
   #assoc.file: association file ( Assumes that file name is of form [Prefix]_SigMtrx_[TargetName].[overlapType].mtrx )
   #std.thresh: columns with stddev. < str.thresh are removed from analysis
+  #use.relaxed: If set to F, then all values <= 0 in the association matrix is set to 0
   
   assoc.matrix <- read.table( assoc.file, header=TRUE )
-  target.name <- gsub( '(^.+SigMtrx_)|(\\.[^/]*mtrx$)' , '' , assoc.file ) # Remove prefix and suffix (.mtrx)
+  target.name <- gsub( '(^.+SigMtrx_)|(\\.[^/]*mtrx(\\.gz)?$)' , '' , assoc.file ) # Remove prefix and suffix (.mtrx)
   
   rownames(assoc.matrix) <- assoc.matrix$PeakID # Peak names are in column named PeakID
   assoc.matrix$PeakID <- gsub( '(^.*Pk_)|(_[^_]+$)' , '' , assoc.matrix$PeakID ) # Convert PeakIds to numbers
@@ -320,6 +321,11 @@ read.assoc.file <- function( assoc.file, std.thresh=NA ) {
   target <- assoc.matrix[ , target.idx ] # target column
   assoc.matrix <- assoc.matrix[ , !target.idx ] # remove target column
 
+  # Processed relaxed norm peaks
+  if (!use.relaxed) {
+    assoc.matrix[(assoc.matrix <= 0)] <- 0
+  }
+  
   # Remove columns that have very low std
   if (! is.na( std.thresh )) {
     col.std <- apply( data.matrix(assoc.matrix) , 2 , sd ) # compute std for each column
@@ -332,6 +338,9 @@ read.assoc.file <- function( assoc.file, std.thresh=NA ) {
   # Set target column as first column in partners matrix
   assoc.matrix <- cbind(target , assoc.matrix)
   colnames(assoc.matrix)[1] <- target.name
+  
+  # Remove bad columns
+  assoc.matrix <- filter.cols(data=assoc.matrix)
   
   return( list(
     assoc.matrix=assoc.matrix,
@@ -351,20 +360,20 @@ read.expr.file <- function(expr.file){
   return(expr.data)
 }
 
-assoc.file.to.Rdata <- function( assoc.file, expr.file=NULL, output.dir=NULL ) {
+assoc.file.to.Rdata <- function( assoc.file, expr.file=NULL, output.dir=NULL, use.relaxed=T ) {
   # ===================================
   # Converts .mtrx file to a R object and saves in an Rdata file
   # ===================================  
   # assoc.file: association text file
   # expr.file: expression file (Col1: peakId, Col2: expression value)
   # output.dir: directory to store corresponding Rdata files
-  
+  # use.relaxed: If set to F, then all values <= 0 in the association matrix is set to 0
   if( is.null(output.dir) ) {
     output.dir <- get.file.parts(assoc.file)$path # if output.dir is not set make it equal to assoc.dir
   }
 
-  assoc.data <- read.assoc.file(assoc.file)
-  output.file <- file.path( output.dir , paste( get.file.parts(assoc.file)$fullname , '.Rdata' , sep="" ) )
+  assoc.data <- read.assoc.file(assoc.file,use.relaxed=use.relaxed)
+  output.file <- file.path( output.dir , paste( get.file.parts(gsub("\\.gz$","",assoc.file))$fullname , '.Rdata' , sep="" ) )
   assoc.data$assoc.mtrx.file <- assoc.file
   assoc.data$assoc.R.file <- output.file
   
@@ -381,7 +390,7 @@ assoc.file.to.Rdata <- function( assoc.file, expr.file=NULL, output.dir=NULL ) {
   
 }
 
-batch.read.assoc.file.to.Rdata <- function( assoc.dir , expr.file=NULL , output.dir=NULL) {
+batch.read.assoc.file.to.Rdata <- function( assoc.dir , expr.file=NULL , output.dir=NULL, use.relaxed=T) {
   # ===================================
   # Reads all .mtrx files in a directory, 
   # converts them to R data frame and stores them
@@ -390,13 +399,14 @@ batch.read.assoc.file.to.Rdata <- function( assoc.dir , expr.file=NULL , output.
   # assoc.dir: directory containing association files
   # expr.file: expression file (Col1: peakId, Col2: expression value)
   # output.dir: directory to store corresponding Rdata files
+  # use.relaxed: If set to F, then all values <= 0 in the association matrix is set to 0
     
   # Search for all .mtrx files in assoc.dir
   assoc.file.paths <- dir( path=assoc.dir , pattern="\\.mtrx(\\.gz)?$" , full.names=TRUE , recursive=TRUE ) 
   
   for ( each.file in assoc.file.paths ) {
     cat("Processing file " , each.file , "\n")
-    try( assoc.file.to.Rdata( each.file, expr.file, output.dir ) , silent=T )
+    try( assoc.file.to.Rdata( each.file, expr.file, output.dir, use.relaxed ) , silent=T )
   }
 }
 
