@@ -4,10 +4,10 @@ nargs = length(args); # number of arguments
 
 # Print usage
 print.usage <- function(){
-  cat("Rscript batch.convert.mtrx2Rdata.R [mtrxDir] [workingDir]\n")
-  cat("Converts all .mtrx file in directories in [mtrxDir]")
+  cat("Rscript batch.convert.mtrx2Rdata.R [mtrxDir] [useRelaxed]\n")
+  cat("Converts all .mtrx file in directories in [mtrxDir]\n")
   cat("   [mtrxDir]: directory containing .mtrx association files\n")
-  cat("   [workingDir]: (OPTIONAL) working directory\n")
+  cat("   [useRelaxed]: (OPTIONAL) Set to F if you want to set relaxed peak values(<=0) to 0\n")
 }
 
 if (nargs < 1) {
@@ -16,21 +16,15 @@ if (nargs < 1) {
 }
 
 matrix.dir <- args[[1]] # mtrx data directory
-work.dir <- tempfile() # Default work directory
+use.relaxed <- T # Default work directory
 
 if (nargs > 1) {
-  work.dir <- args[[2]]
-}
-
-if (! file.exists(work.dir)) {
-  dir.create(work.dir)
+  use.relaxed <- as.logical(args[[2]])
 }
 
 source("assoc.matrix.utils.R")
-platform <- "linux"
-rfhome <- initialize.rulefit( work.dir=work.dir, rf.package.path=Sys.getenv("RULEFITBASE") )
 
 for (each.dir in list.dirs(matrix.dir)) {
   cat("Converting directory ",each.dir,"\n")
-  batch.read.assoc.file.to.Rdata(each.dir)
+  batch.read.assoc.file.to.Rdata(each.dir,use.relaxed=use.relaxed)
 }
