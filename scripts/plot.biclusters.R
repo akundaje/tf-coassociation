@@ -61,6 +61,8 @@ clust.results <- plot.heatmap(t(assoc.data$assoc.matrix),
              break.type="linear",
              clust.method="ward",
              #dist.metric="pearson",
+             break.lowerbound=1e-4,
+             break.upperbound=0.5,
              scale="none")
 
 clust.results$assoc.data.file <- assoc.data.file

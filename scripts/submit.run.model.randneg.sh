@@ -42,11 +42,15 @@ if [[ "$#" -gt 4 ]]
 fi
 
 MEM=4
+DEFMEM=1
 if [[ "$#" -gt 5 ]]
     then
     MEM=$6
+    DEFMEM=0
 fi
 MEM=$(( MEM * 1024 ))
+
+JOBGROUPID="/jobgroup_${RANDOM}_${RANDOM}"
 
 for iFile in $(find ${IDIR} -regextype posix-extended -type f -regex ${IREGEX})
   do
@@ -64,9 +68,18 @@ for iFile in $(find ${IDIR} -regextype posix-extended -type f -regex ${IREGEX})
     #bsub -M "${MEM}" -R "rusage[mem=${MEM}]" -o ${logFile} -e ${errFile} "Rscript ${SCRIPT_NAME} ${iFile} ${OUTFILE}"
     if [[ ! -e ${OUTFILE} ]]
 	then
-	#bsub -q research-rh6 -W 94:00 -M ${MEM} -R "rusage[mem=${MEM}]" -o ${logFile} -e ${errFile} "mkdir ${TMP_DIR} ; Rscript ${SCRIPT_NAME} ${iFile} ${OUTFILE} 0 ${TMP_DIR} ; rm -rf ${TMP_DIR}"
-	bsub -q research-rh6 -W 94:00 -o ${logFile} -e ${errFile} "mkdir ${TMP_DIR} ; Rscript ${SCRIPT_NAME} ${iFile} ${OUTFILE} 0 ${TMP_DIR} ; rm -rf ${TMP_DIR}"
+	if [[ ${DEFMEM} -eq 0 ]]
+	    then
+	    bsub -g ${JOBGROUPID} -q research-rh6 -W 94:00 -M ${MEM} -R "rusage[mem=${MEM}]" -o ${logFile} -e ${errFile} "mkdir ${TMP_DIR} ; Rscript ${SCRIPT_NAME} ${iFile} ${OUTFILE} 0 ${TMP_DIR} ; rm -rf ${TMP_DIR}"
+	else
+	    bsub -g ${JOBGROUPID} -q research-rh6 -W 94:00 -o ${logFile} -e ${errFile} "mkdir ${TMP_DIR} ; Rscript ${SCRIPT_NAME} ${iFile} ${OUTFILE} 0 ${TMP_DIR} ; rm -rf ${TMP_DIR}"
+	fi
     fi
   done
+  while [[ $(bjobs -r -g "${JOBGROUPID}" | wc -l | awk '{print $1}') -gt 500 ]]
+    do
+    sleep 3m
+  done
+  #sleep 15s
 done
 

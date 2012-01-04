@@ -48,6 +48,7 @@ for ( i in pair.names ) {
   av.pair.interactions[[i]] <- data.frame()
 }
 target.name <- rulefit.results$dataset$target.name
+rulefit.results$cv$lo <- NULL
 
 for ( curr.file in all.Rdata.files ) {
   cat(curr.file,"\n")

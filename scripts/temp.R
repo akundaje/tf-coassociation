@@ -74,16 +74,54 @@ rfhome <- initialize.rulefit(rf.package.path='/media/fusion10/work/encode/learni
 #   save(list="rulefit.results", file=i)
 # }
 
-input.dir <- "/media/fusion10/work/encode/learning/combinatorics/results/TFCentric/randneg_iter/K562/average/OA_tree10_average"
-output.dir <- "/media/fusion10/work/encode/learning/combinatorics/figures/TFCentric/randneg_iter/K562/OA_tree10_average"
-for (i in list.files(path=input.dir,pattern=".*Rdata$",full.names=T)) {
-  tryCatch( plot.average.vi(rulefit.results=i,output.dir=output.dir,thresh=5), error = function(e) cat("ERROR\n"))
-  tryCatch( plot.average.int.strength(rulefit.results=i,output.dir=output.dir,thresh=1e-3), error = function(e) cat("ERROR\n"))
-  #tryCatch( plot.average.pairwise(rulefit.results=i,output.dir=output.dir), error = function(e) cat("ERROR\n"))
-  tryCatch( plot.average.pairwise.matrix(rulefit.results=i,output.dir=output.dir), error = function(e) cat("ERROR\n"))
-  tryCatch( write.table.average.pairwise.matrix(rulefit.results=i,output.dir=output.dir), error = function(e) cat("ERROR\n"))
-}
+# 
+# for (cell in c("OA_average",
+#                "OA_max_relaxed_average",
+#                "OA_max_relaxed_tree6_average",
+#                "OA_max_relaxed_trim_average",
+#                "OA_max_relaxed_trim_tree10_average",
+#                "OA_max_relaxed_trim_tree6_average",
+#                "OA_max_relaxed_trim_tree8_average",
+#                "OA_relaxed_average",
+#                "OA_tree10_average",
+#                "OA_tree6_average",
+#                "OA_tree8_average",
+#                "OF_average",
+#                "OF_max_relaxed_average",
+#                "OF_max_relaxed_tree6_average",
+#                "OF_max_relaxed_trim_average",
+#                "OF_max_relaxed_trim_tree6_average",
+#                "OF_tree6_average",
+#                "OO_average",
+#                "OT_average"
+#                )) {
+#   input.dir <- sprintf("/media/fusion10/work/encode/learning/combinatorics/results/TFCentric/randneg_iter/K562/average/%s",cell)
+#   output.dir <- sprintf("/media/fusion10/work/encode/learning/combinatorics/figures/TFCentric/randneg_iter/K562/%s",cell)
+# 
+# #   input.dir <- "/media/fusion10/work/encode/learning/combinatorics/results/TFCentric/randneg_iter/K562/average/OA_tree8_average"
+# #   output.dir <- "/media/fusion10/work/encode/learning/combinatorics/figures/TFCentric/randneg_iter/K562/OA_tree8_average"
+#   dir.create(path=output.dir,recursive=T)
+#   for (i in list.files(path=input.dir,pattern=".*Rdata$",full.names=T)) {
+#   #   tryCatch( plot.average.vi(rulefit.results=i,output.dir=output.dir,thresh=5), error = function(e) cat("ERROR\n"))
+#   #   tryCatch( plot.average.int.strength(rulefit.results=i,output.dir=output.dir,thresh=1e-3), error = function(e) cat("ERROR\n"))
+#     #tryCatch( plot.average.pairwise(rulefit.results=i,output.dir=output.dir), error = function(e) cat("ERROR\n"))
+#     tryCatch( plot.average.pairwise.matrix(rulefit.results=i,output.dir=output.dir), error = function(e) cat("ERROR\n"))
+#   #   tryCatch( write.table.average.pairwise.matrix(rulefit.results=i,output.dir=output.dir), error = function(e) cat("ERROR\n"))
+#   }
+# }
 
+for (cell in c("Hepg2")) {
+  input.dir <- sprintf("/media/fusion10/work/encode/learning/combinatorics/results/TFCentric/randneg_iter/%s/average/OF_max_relaxed_tree6_average",cell)
+  output.dir <- sprintf("/media/fusion10/work/encode/learning/combinatorics/figures/TFCentric/randneg_iter/%s/OF_max_relaxed_tree6_average",cell)
+  dir.create(path=output.dir,recursive=T)
+  for (i in list.files(path=input.dir,pattern=".*Rdata$",full.names=T)) {
+    tryCatch( plot.average.vi(rulefit.results=i,output.dir=output.dir,thresh=5), error = function(e) cat("ERROR\n"))
+    tryCatch( plot.average.int.strength(rulefit.results=i,output.dir=output.dir,thresh=1e-3), error = function(e) cat("ERROR\n"))
+    #tryCatch( plot.average.pairwise(rulefit.results=i,output.dir=output.dir), error = function(e) cat("ERROR\n"))
+    tryCatch( plot.average.pairwise.matrix(rulefit.results=i,output.dir=output.dir), error = function(e) cat("ERROR\n"))
+    tryCatch( write.table.average.pairwise.matrix(rulefit.results=i,output.dir=output.dir), error = function(e) cat("ERROR\n"))
+  }
+}
 # input.dir <- "/media/fusion10/work/encode/learning/combinatorics/results/PWMs/all"
 # for (i in list.files(path=input.dir,pattern=".*Rdata$",full.names=T)) {
 #   rulefit.results <- get.average.pairwise( get.average.int.strength( get.average.vi(i) ) )

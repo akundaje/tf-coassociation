@@ -37,20 +37,20 @@ out.Rdata.file <- file.path(output.dir, sprintf("%s.allTF.globalVals.Rdata",outp
 
 out.vi.file <- file.path(output.dir, sprintf("%s.allTF.factor.importance.matrix.xls",output.prefix))
 out.vi.stats.file <- file.path(output.dir, sprintf("%s.allTF.factor.importance.stats.xls",output.prefix))
-out.vi.plot <- file.path(output.dir, sprintf("%s.allTF.factor.importance.png",output.prefix))
+out.vi.plot <- file.path(output.dir, sprintf("%s.allTF.factor.importance.pdf",output.prefix))
 
-out.scaled.vi.plot <- file.path(output.dir, sprintf("%s.allTF.scaled.factor.importance.png",output.prefix))
+out.scaled.vi.plot <- file.path(output.dir, sprintf("%s.allTF.scaled.factor.importance.pdf",output.prefix))
 
 out.int.file <- file.path(output.dir, sprintf("%s.allTF.int.strength.matrix.xls",output.prefix))
 out.int.stats.file <- file.path(output.dir, sprintf("%s.allTF.int.strength.stats.xls",output.prefix))
-out.int.plot <- file.path(output.dir, sprintf("%s.allTF.int.strength.png",output.prefix))
+out.int.plot <- file.path(output.dir, sprintf("%s.allTF.int.strength.pdf",output.prefix))
 
 out.pair.file <- file.path(output.dir, sprintf("%s.allTF.target.pair.interact.matrix.xls",output.prefix))
 out.pair.stats.file <- file.path(output.dir, sprintf("%s.allTF.target.pair.interact.stats.xls",output.prefix))
-out.pair.plot <- file.path(output.dir, sprintf("%s.allTF.target.pair.interact.png",output.prefix))
+out.pair.plot <- file.path(output.dir, sprintf("%s.allTF.target.pair.interact.pdf",output.prefix))
 
-out.accuracy.plot <- file.path(output.dir, sprintf("%s.allTF.accuracy.png",output.prefix))
-out.auc.plot <- file.path(output.dir, sprintf("%s.allTF.auc.png",output.prefix))
+out.accuracy.plot <- file.path(output.dir, sprintf("%s.allTF.accuracy.pdf",output.prefix))
+out.auc.plot <- file.path(output.dir, sprintf("%s.allTF.auc.pdf",output.prefix))
   
 # Get list of Rdata files
 all.Rdata.files <- list.files(path=input.dir, pattern=".*average.*Rdata$", full.names=T) # Get names of Rdata files
@@ -199,9 +199,9 @@ if (nrow(all.vi.matrix) > 0) {
                replace.na=F,
                num.breaks=255,
                clust.method="ward",
-               #dist.metric="pearson",
-               break.lowerbound=20,
-               break.upperbound=70,                 
+               #dist.metric="spearman",
+#                break.lowerbound=20,
+#                break.upperbound=80,                 
                break.type="linear")
 }
 
@@ -216,14 +216,15 @@ if (nrow(all.int.strength.matrix) > 0) {
                row.title="Target TF context",
                col.title="TFs",
                title.name="Conditional interaction strength",
-               filt.thresh=1e-3,
-               pseudo.count=1e-30,
-               logval=F,
+               filt.thresh=1e-7,
+               pseudo.count=0,
+               logval=T,
                replace.diag=F,
                replace.na=F,
                num.breaks=255,
                clust.method="ward",
-               break.type="quantile")
+               break.lowerbound=6,
+               break.type="linear")
 }
 
 # rownames(global.pairwise.int.matrix) <- gsub("GM12878|K562|HelaS3|Hepg2|H1hesc", "", toupper( gsub("K562b|Hepg2b", "B-",rownames(global.pairwise.int.matrix)) ), ignore.case=T)
@@ -233,25 +234,45 @@ rownames(global.pairwise.int.matrix) <- standardize.name(rownames(global.pairwis
 colnames(global.pairwise.int.matrix) <- standardize.name(colnames(global.pairwise.int.matrix))
 
 if (nrow(global.pairwise.int.matrix) > 0) {
-  clust.results <- plot.heatmap(data=global.pairwise.int.matrix,
-               show.dendro="none",
-               symm.cluster=T,
-               to.file=out.pair.plot,
-               row.title="Target TFs",
-               col.title="Partners of target TF",
-               title.name="Global pairwise interactions",
-               filt.thresh=1e-7,
-               pseudo.count=1e-30,
-               logval=F,
-               replace.diag=T,
-               replace.na=T,
-               num.breaks=255,
-               clust.method="ward",
-               #dist.metric="spearman",
-               break.type="quantile",
-               break.lowerbound=1e-3,
-               #break.upperbound=1e-3
-               )               
+#   clust.results <- plot.heatmap(data=global.pairwise.int.matrix,
+#                show.dendro="none",
+#                symm.cluster=T,
+#                to.file=out.pair.plot,
+#                row.title="Target TFs",
+#                col.title="Partners of target TF",
+#                title.name="Global pairwise interactions",
+#                filt.thresh=1e-7,
+#                pseudo.count=1e-30,
+#                logval=F,
+#                replace.diag=T,
+#                replace.na=T,
+#                num.breaks=255,
+#                clust.method="ward",
+#                #dist.metric="spearman",
+#                break.type="quantile",
+#                break.lowerbound=1e-3,
+#                #break.upperbound=1e-3
+#                )               
+  clust.results <- plot.heatmap(data=global.pairwise.int.matrix, 
+                                use.as.dist=F,
+                                show.dendro="both",
+                                symm.cluster=T,
+                                to.file=out.pair.plot,
+                                row.title="Target TFs",
+                                col.title="Partners of target TF",
+                                title.name="Global pairwise interactions",
+                                filt.thresh=1e-7,
+                                pseudo.count=0,
+                                logval=T,
+                                replace.diag=T,
+                                replace.na=T,
+                                num.breaks=255,
+                                clust.method="ward",
+                                dist.metric="spearman",
+                                break.type="linear",
+                                break.lowerbound=4.5,
+                                #break.upperbound=1e-3
+                                )                 
 }
 
 # plot.heatmap(data=temp.matrix,row.cluster=F,col.cluster=F,
