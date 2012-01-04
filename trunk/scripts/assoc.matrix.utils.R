@@ -213,17 +213,17 @@ filter.rows <- function(data) {
   return(data)
 }
 
-standardize.name <- function(names, conversion.file="name.conversion.tab") {
+standardize.name <- function(temp.names, conversion.file="name.conversion.tab") {
   # Converts arbitrary TF names to standardized names
-  # names: array of TF names
+  # temp.names: array of TF names
   # conversion.file: 3 columns, Col1(cell.line), Col2(arbit.name), Col3(std.name)
   
   conv.table <- read.table(file="name.conversion.tab",header=T,sep="\t",stringsAsFactors=F)
-  conv.idx <- match(tolower(names), tolower(conv.table$arbit.name)) # match names
+  conv.idx <- match(tolower(temp.names), tolower(conv.table$arbit.name)) # match names
   not.found <- which(is.na(conv.idx)) # find names that are not found in conv.table
   
   conv.names <- conv.table$std.name[conv.idx]
-  conv.names[not.found] <- names[not.found] # Use original names for names not found in conv.table
+  conv.names[not.found] <- as.character(temp.names[not.found]) # Use original names for names not found in conv.table
   return(conv.names)
 }
 
@@ -430,29 +430,56 @@ batch.update.Rdata.with.expr.zscr <- function(assoc.dir, expr.zscr.file) {
  }
 }
 
-randomize.assoc.matrix <- function(assoc.data, num.rand=1){
+randomize.assoc.matrix <- function(assoc.data, num.rand=1, rand.dim=2){
   # ===================================
   # Create randomized association matrix
   # Each column is randomized individually
   # rownames are assigned '_random' suffix
   # num.rand: number of random instantiations of the matrix that should be row bound to give the final random matrix
+  # rand.dim: 0 (randomize rows and columns), 1 (randomize rows), 2 (randomize columns)
   # ===================================  
   # assoc.data$assoc.matrix
   # assoc.data$target.name
   
-  random.assoc.matrix <- as.data.frame( apply( assoc.data$assoc.matrix , 2 , sample ) ) # apply the 'sample' function to each column of assoc.matrix
-  rownames(random.assoc.matrix) <- paste( rownames(random.assoc.matrix) , 'random' , sep="_" ) # Add '_random' suffix to each row name
-  
-  if (num.rand > 1) {
-    for (i in c(2:num.rand)) {
-      temp.matrix <- as.data.frame( apply( assoc.data$assoc.matrix , 2 , sample ) )
-      rownames(temp.matrix) <- paste( rownames(temp.matrix) , 'random' , sep="_" ) # Add '_random' suffix to each row name
-      random.assoc.matrix <- rbind( random.assoc.matrix, temp.matrix  )
-    }
+  # Load assoc.data if it is the name of a file
+  if (is.character(assoc.data)) {
+    load(assoc.data)    
   }
-  # random.assoc.matrix[ , assoc.data$target.name ] <- -1 # Set target column to -1
-  return(random.assoc.matrix)
   
+  if (rand.dim==0) {
+    
+    random.assoc.matrix <- as.data.frame( apply( assoc.data$assoc.matrix , 2 , sample ) ) # apply the 'sample' function to each column of assoc.matrix
+    random.assoc.matrix <- as.data.frame( apply( random.assoc.matrix , 1 , sample ) ) # apply the 'sample' function to each row of assoc.matrix
+    rownames(random.assoc.matrix) <- paste( rownames(random.assoc.matrix) , 'random' , sep="_" ) # Add '_random' suffix to each row name
+    colnames(random.assoc.matrix) <- colnames(assoc.data$assoc.matrix)
+    
+    if (num.rand > 1) {
+      for (i in c(2:num.rand)) {
+        temp.matrix <- as.data.frame( apply( assoc.data$assoc.matrix , 2 , sample ) )
+        temp.matrix <- as.data.frame( apply( temp.matrix , 1 , sample ) )
+        rownames(temp.matrix) <- paste( rownames(temp.matrix) , 'random' , sep="_" ) # Add '_random' suffix to each row name
+        colnames(temp.matrix) <- colnames(assoc.data$assoc.matrix)
+        random.assoc.matrix <- rbind( random.assoc.matrix, temp.matrix  )
+      }
+    }
+    
+  } else {
+    
+    random.assoc.matrix <- as.data.frame( apply( assoc.data$assoc.matrix , rand.dim , sample ) ) # apply the 'sample' function to each column of assoc.matrix
+    rownames(random.assoc.matrix) <- paste( rownames(random.assoc.matrix) , 'random' , sep="_" ) # Add '_random' suffix to each row name
+    colnames(random.assoc.matrix) <- colnames(assoc.data$assoc.matrix)
+    if (num.rand > 1) {
+      for (i in c(2:num.rand)) {
+        temp.matrix <- as.data.frame( apply( assoc.data$assoc.matrix , rand.dim , sample ) )
+        rownames(temp.matrix) <- paste( rownames(temp.matrix) , 'random' , sep="_" ) # Add '_random' suffix to each row name
+        colnames(temp.matrix) <- colnames(assoc.data$assoc.matrix)
+        random.assoc.matrix <- rbind( random.assoc.matrix, temp.matrix  )
+      }
+    }
+    
+  }  
+  # random.assoc.matrix[ , assoc.data$target.name ] <- -1 # Set target column to -1
+  return(random.assoc.matrix)  
 }
 
 make.assoc.classf.rand.dataset <- function(assoc.data, rm.target=F, num.rand=1, trim.target=T){
@@ -621,7 +648,7 @@ run.rulefit <- function(assoc.classf.data, mode="class", corr.penalty=3, model.t
                    max.rules=2000,
                    tree.size=tree.size,
                    test.reps=test.reps,
-		   quiet=T
+                   quiet=T
                    )  
   return(rfmod)
 }
@@ -1061,7 +1088,8 @@ learn.posneg.rulefit.model <- function(pos.assoc.data , neg.assoc.data, rm.targe
     pair.interactions=pair.interactions) )
 }
   
-plot.heatmap <- function(data, 
+plot.heatmap <- function(data,
+                         use.as.dist=F,
                          to.file=NULL, 
                          row.title="rows", 
                          col.title="cols", 
@@ -1085,6 +1113,7 @@ plot.heatmap <- function(data,
   # ===================================
   # Plot clustered heatmap of associations
   # data: any data frame (Rows: are binding sites, Cols: partner TFs)
+  # use.as.dist: use data directly as a similarity matrix (data must be symmetric matrix/data frame)
   # to.file: png/pdf file that you want to save the figure to (default: no saving)
   # row.title: axis title for rows
   # col.title: axis title for columns
@@ -1136,8 +1165,13 @@ plot.heatmap <- function(data,
   # Add a small random number to each value to avoid problems with clustering
   clean.data <- as.matrix(data) + (pseudo.count * matrix( data=runif(prod(data.size)), data.size[1], data.size[2]) )
   if (logval) {
-    clean.data <- log2(clean.data)
-    if (!is.na(filt.thresh)) { filt.thresh=log2(filt.thresh) }
+    clean.data <- log10(clean.data)
+    clean.data[is.infinite(clean.data)] <- NA    
+    if (!is.na(filt.thresh)) { 
+      filt.thresh <- log10(filt.thresh)
+      clean.data <- clean.data - filt.thresh
+      clean.data[which(clean.data < 0)] <- 0
+      }
   }
   breaks.data <- as.vector(clean.data)
   min.val <- min(breaks.data,na.rm=T)
@@ -1324,26 +1358,42 @@ plot.heatmap <- function(data,
   if (grepl(pattern="pearson|spearman",x=dist.metric)) {
     if (is.logical(row.cluster)) {
       if (row.cluster) {
-        row.cluster.results <- hclust( as.dist( 1 - cor( t(clean.data),method=dist.metric,use="na.or.complete" )^2),method=clust.method )
+        if (use.as.dist) {
+          row.cluster.results <- hclust( as.dist( -clean.data ), method=clust.method )  
+        } else {        
+          row.cluster.results <- hclust( as.dist( 1 - cor( t(clean.data),method=dist.metric,use="na.or.complete" )^2),method=clust.method )
+        }
         row.cluster <- as.dendrogram(row.cluster.results)
       }  
     }
     if (is.logical(col.cluster)) {
       if (col.cluster) {
-        col.cluster.results <- hclust( as.dist( 1 - cor( clean.data,method=dist.metric,use="na.or.complete" )^2),method=clust.method )
+        if (use.as.dist) {
+          col.cluster.results <- hclust( as.dist( -t(clean.data)), method=clust.method )
+        } else {        
+          col.cluster.results <- hclust( as.dist( 1 - cor( clean.data,method=dist.metric,use="na.or.complete" )^2),method=clust.method )
+        }
         col.cluster <- as.dendrogram(col.cluster.results)        
       }  
     }
   } else {
     if (is.logical(row.cluster)) {
-      if (row.cluster) {
-        row.cluster.results <- hclust( dist( clean.data, method=dist.metric ), method=clust.method )
+      if (row.cluster) {        
+        if (use.as.dist) {
+          row.cluster.results <- hclust( as.dist( -clean.data ), method=clust.method )  
+        } else {
+          row.cluster.results <- hclust( dist( clean.data, method=dist.metric ), method=clust.method )  
+        }        
         row.cluster <- as.dendrogram(row.cluster.results)
       }  
     }
     if (is.logical(col.cluster)) {
       if (col.cluster) {
-        col.cluster.results <- hclust( dist( t(clean.data), method=dist.metric ), method=clust.method )
+        if (use.as.dist) {
+          col.cluster.results <- hclust( as.dist( -t(clean.data)), method=clust.method )
+        } else {
+          col.cluster.results <- hclust( dist( t(clean.data), method=dist.metric ), method=clust.method ) 
+        }        
         col.cluster <- as.dendrogram(col.cluster.results)        
       }  
     }    
@@ -1352,8 +1402,12 @@ plot.heatmap <- function(data,
 #   clean.data <- orig.clean.data
   # Check if user wants to cluster rows and columns symmetrically
   if ( symm.cluster && (nrow(clean.data) == ncol(clean.data)) ) {
-    col.cluster <- row.cluster
-    col.cluster.results <- row.cluster.results
+    if (all(rownames(clean.data) %in% colnames(clean.data))) {
+      m.idx <- match(rownames(clean.data),colnames(clean.data))
+      clean.data <- clean.data[,m.idx]
+      col.cluster <- row.cluster
+      col.cluster.results <- row.cluster.results      
+    }
   }
 
   # Plot heat map
@@ -1539,44 +1593,44 @@ plot.pairwise <- function(rulefit.results, output.dir=NULL, ext="png", filt.thre
   }
 }
 
-plot.pairwise.matrix <- function(rulefit.results, output.dir=NULL, output.filename=NULL, ext="png", filt.thresh=1e-7){
-  # ===================================
-  # Plots interaction strength
-  # Takes as input rulefit.results (list) OR
-  # Rdata file name (string) that contains rulefit.results 
-  # ===================================  
-  # rulefit.results: Rdata file name containing rulefit.results list OR the rulefit.results LIST
-  # output.dir: directory where you want to save all figure
-  # output.filename: OPTIONAL file name (no path)
-  # ext: OPTIONAL plot type (png/pdf)
-  
-  # Load rulefit.results if input is a data list
-  if (is.character(rulefit.results)) {
-    load(rulefit.results)    
-  }
-  target.name <- rulefit.results$dataset$target.name
-  plot.title <- sprintf("Interaction Strength | %s",target.name)
-  
-  if ( !is.null(output.dir) ) {
-    output.dir <- file.path(output.dir,target.name) 
-    # Create output directory if it doesnt exist
-    if (!file.exists(output.dir)){
-      dir.create(output.dir,recursive=T)
-    }  
-  
-    if (is.null(output.filename)) {
-      output.filename <- file.path( output.dir , sprintf("int.strength.%s.%s",target.name,ext) )
-    } else {
-      output.filename <- file.path( output.dir , get.file.parts(output.filename)$fullname )
-    }
-  }
-
-  if (! is.null(filt.thresh) ) {
-    rulefit.results$int.strength <- rulefit.results$int.strength[, (rulefit.results$int.strength >= filt.thresh) ]
-  }
-  
-  make.barplot( as.numeric(rulefit.results$int.strength), labels=toupper(colnames(rulefit.results$int.strength)), title.name=plot.title , to.file=output.filename )
-}
+# plot.pairwise.matrix <- function(rulefit.results, output.dir=NULL, output.filename=NULL, ext="png", filt.thresh=1e-7){
+#   # ===================================
+#   # Plots interaction strength
+#   # Takes as input rulefit.results (list) OR
+#   # Rdata file name (string) that contains rulefit.results 
+#   # ===================================  
+#   # rulefit.results: Rdata file name containing rulefit.results list OR the rulefit.results LIST
+#   # output.dir: directory where you want to save all figure
+#   # output.filename: OPTIONAL file name (no path)
+#   # ext: OPTIONAL plot type (png/pdf)
+#   
+#   # Load rulefit.results if input is a data list
+#   if (is.character(rulefit.results)) {
+#     load(rulefit.results)    
+#   }
+#   target.name <- rulefit.results$dataset$target.name
+#   plot.title <- sprintf("Interaction Strength | %s",target.name)
+#   
+#   if ( !is.null(output.dir) ) {
+#     output.dir <- file.path(output.dir,target.name) 
+#     # Create output directory if it doesnt exist
+#     if (!file.exists(output.dir)){
+#       dir.create(output.dir,recursive=T)
+#     }  
+#   
+#     if (is.null(output.filename)) {
+#       output.filename <- file.path( output.dir , sprintf("int.strength.%s.%s",target.name,ext) )
+#     } else {
+#       output.filename <- file.path( output.dir , get.file.parts(output.filename)$fullname )
+#     }
+#   }
+# 
+#   if (! is.null(filt.thresh) ) {
+#     rulefit.results$int.strength <- rulefit.results$int.strength[, (rulefit.results$int.strength >= filt.thresh) ]
+#   }
+#   
+#   make.barplot( as.numeric(rulefit.results$int.strength), labels=toupper(colnames(rulefit.results$int.strength)), title.name=plot.title , to.file=output.filename )
+# }
 
 plot.singleplot <- function(rulefit.results, output.dir=NULL, ext="png", filt.thresh=1e-7){
   # ===================================
@@ -1676,9 +1730,8 @@ get.average.cv <- function(rulefit.results) {
   }
   
   target.name <- rulefit.results$target.name
-
-  # Get mean, std, lqr and hqr of all cross-validation metrics
   rulefit.results$cv$lo <- NULL
+  # Get mean, std, lqr and hqr of all cross-validation metrics
   cv.names <- colnames(rulefit.results$cv)
   mean.val <- apply(rulefit.results$cv, 2, function(x) median(x,na.rm=T)) # get mean of each column
   std.val <- apply(rulefit.results$cv, 2, function(x) sd(x,na.rm=T)) # get std of each column
@@ -1998,7 +2051,7 @@ plot.average.pairwise <- function(rulefit.results, output.dir, ext="png", filter
   }  
 }
   
-plot.average.pairwise.matrix <- function(rulefit.results, output.dir, output.filename=NA, ext="png", filter.thresh=1e-7) {
+plot.average.pairwise.matrix <- function(rulefit.results, output.dir, output.filename=NA, ext="pdf", filter.thresh=1e-7) {
   # ===================================
   # Plots heatmap of average/aggregated conditional pairwise interactions
   # Takes as input rulefit.results (list) OR
@@ -2036,22 +2089,40 @@ plot.average.pairwise.matrix <- function(rulefit.results, output.dir, output.fil
   rownames(val.data) <- standardize.name(rownames(val.data))
   colnames(val.data) <- standardize.name(colnames(val.data))
   
+#   plot.heatmap( data=val.data,
+#                 show.dendro="none",
+#                 to.file=output.filename,
+#                 row.title="Transcription Factors",
+#                 col.title="Transcription Factors",
+#                 title.name="",
+#                 filt.thresh=filter.thresh,
+#                 pseudo.count=1e-30,
+#                 logval=F,
+#                 replace.diag=T,
+#                 replace.na=T,
+#                 num.breaks=255,
+#                 #clust.method="ward",
+#                 clust.method="single",
+#                 break.lowerbound=1e-3,
+#                 break.type="quantile")
+  
   plot.heatmap( data=val.data,
+                use.as.dist=T,
                 show.dendro="none",
                 to.file=output.filename,
                 row.title="Transcription Factors",
                 col.title="Transcription Factors",
                 title.name="",
                 filt.thresh=filter.thresh,
-                pseudo.count=1e-30,
-                logval=F,
+                pseudo.count=0,
+                logval=T,
                 replace.diag=T,
                 replace.na=T,
                 num.breaks=255,
-                #clust.method="ward",
-                clust.method="single",
-                break.lowerbound=1e-3,
-                break.type="quantile")                
+                #clust.method="complete",
+                clust.method="ward",
+                break.lowerbound=4.5,                  
+                break.type="linear")  
 }
 
 write.table.average.pairwise.matrix <- function(rulefit.results, output.dir, filter.thresh=1e-7) {
@@ -2102,6 +2173,66 @@ write.table.average.pairwise.matrix <- function(rulefit.results, output.dir, fil
     }
     count=count+1
   }
+}
+
+write.symmetric.average.pairwise.matrix <- function(rulefit.results, output.dir, sparsify=T, filt.thresh=1e-7) {
+  # ===================================
+  # Write average/aggregated conditional pairwise interaction matrix to a tab delimited file
+  # Takes as input rulefit.results (list) OR
+  # Rdata file name (string) that contains rulefit.results 
+  # ===================================  
+  # rulefit.results: Rdata file name containing aggregated rulefit.results list OR the aggregated rulefit.results LIST
+  # output.dir: directory where you want to save all figure
+
+  # Load rulefit.results if input is a character vector
+  if (is.character(rulefit.results)) {
+    load(rulefit.results)    
+  }
+  
+  target.name <- rulefit.results$target.name
+  #output.dir <- file.path(output.dir,target.name) 
+  # Create output directory if it doesnt exist
+  if (!file.exists(output.dir)){
+    dir.create(output.dir, recursive=T)
+  }
+
+  # Write pairwise interactions as matrix
+  output.filename <- file.path( output.dir , sprintf("cond.pairwise.int.symm.log.matrix.%s.tab",target.name) )
+  val.data <- rulefit.results$mean.pairwise.int.matrix
+  # Remove cols with very small values
+  na.idx <- apply( val.data , 2 , function(x) all((x<filt.thresh),na.rm=T) )
+  val.data <- val.data[ , !na.idx]
+  # Remove rows with all very small values
+  na.idx <- apply( val.data , 1 , function(x) all((x<filt.thresh),na.rm=T) )
+  val.data <- val.data[!na.idx, ]
+  # Remove blacklisted TFs
+  val.data <- filter.rows(filter.cols(val.data)) 
+  # Make symmetric
+  val.data <- (val.data + t(val.data))/2
+  # Remove lower triangle
+  val.data[lower.tri(val.data)] <- NA
+  # Standardize names
+  rownames(val.data) <- standardize.name(rownames(val.data))
+  colnames(val.data) <- standardize.name(colnames(val.data))
+  # Convert to log10
+  val.data <- log10(as.matrix(val.data))
+  val.data[is.infinite(val.data)] <- NA
+  if (sparsify) {
+    val.data <- val.data - log10(filt.thresh)
+  } else {
+    val.data <- val.data - min(val.data,na.rm=T)  
+  }  
+  val.data[which(val.data <= 0)] <- NA
+  #val.data[val.data < 0] <- 0
+  # Remove rows and cols with all NAs
+#   na.idx <- apply( val.data , 2 , function(x) all(is.na(x)) )
+#   val.data <- val.data[ , !na.idx]
+  
+  # Remove rows with all NAs
+  na.idx <- apply( val.data , 1 , function(x) all(is.na(x)) )
+  val.data <- val.data[!na.idx, ]
+  val.data <- val.data[ , !na.idx]
+  write.table(val.data, file=output.filename, quote=F, sep="\t", col.names=NA, na="-")  
 }
 
 compute.proximal.distal.diff.importance <- function(input.dir, 
@@ -2652,7 +2783,46 @@ learn.histone.to.tf.regression.model <- function(assoc.data, inverted=T){
     int.strength=int.strength,
     pair.interactions=pair.interactions) )
 }
+
+merge.histone.tf.datasets <- function(tf.assoc.data, hist.assoc.data, output.dir=NA) {
+  # Merges a tf coassociation dataset for a target TF with a histone coassociation dataset for the target TF
   
+  # Load TF data if required
+  if (is.character(tf.assoc.data)) {
+    load(tf.assoc.data)
+    tf.assoc.data <- assoc.data
+  }
+  
+  # Load histone data if required
+  if (is.character(hist.assoc.data)) {
+    load(hist.assoc.data)
+    hist.assoc.data <- assoc.data
+  }
+  
+  # NOTE: TF datasets have rowname indices flipped so sort them opposite to histone data
+  
+  # Check that number of rows are the same
+  if( nrow(hist.assoc.data$assoc.matrix) != nrow(tf.assoc.data$assoc.matrix) ) {
+    stop("number of rows of TF dataset not matching number of rows of histone dataset\n")
+  }
+  
+  # Sort rows and then merge
+  tf.row.ids <- as.numeric(gsub(pattern=".*_([0-9]+)_?.*",replacement="\\1",x=rownames(tf.assoc.data$assoc.matrix)))
+  tf.row.ids <- length(tf.row.ids) - tf.row.ids + 1
+  hist.row.ids <- as.numeric(gsub(pattern=".*_([0-9]+)_?.*",replacement="\\1",x=rownames(hist.assoc.data$assoc.matrix)))
+  hist.row.perm <- match(hist.row.ids, tf.row.ids)
+  merged.assoc.matrix <- cbind(tf.assoc.data$assoc.matrix, hist.assoc.data$assoc.matrix[hist.row.perm,])
+  assoc.data <- list(assoc.matrix=merged.assoc.matrix,
+                     target.name=tf.assoc.data$target.name,
+                     hist.target.name=hist.assoc.data$target.name)
+  
+  if (!is.na(output.dir)) {
+    save(list="assoc.data", file=file.path(output.dir, paste(tf.assoc.data$target.name,".mtrx.tfhist.Rdata",sep="")))
+  }
+  
+  return(assoc.data)              
+}
+
 # =======================================
 # TODO
 # (1) Affinity matrix using random forests, clustering using fuzzy c-means
