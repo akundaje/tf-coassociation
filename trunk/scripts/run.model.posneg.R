@@ -10,7 +10,7 @@ print.usage <- function(){
   cat("   [posRdata]: .Rdata file containing association matrix\n")
   cat("   [negRdata]: .Rdata file containing association matrix\n")
   cat("   [outputFile]: Path to output File\n")
-  cat("   [replaceFlag]: (OPTIONAL) If set to a 0, then if output file exits, the run will quit and not replace it, DEFAULT:0\n")
+  cat("   [replaceFlag]: (OPTIONAL) If set to a F, then if output file exits, the run will quit and not replace it, DEFAULT:F\n")
   cat("   [workingDir]: (OPTIONAL) working directory, DEFAULT: tempfile()\n")
 }
 
@@ -33,9 +33,9 @@ if (! file.exists(neg.Rdata.file)) {
 
 output.file <- args[[3]] # Output File name
 
-replace.flag <- 0 # do not replace existing file
+replace.flag <- F # do not replace existing file
 if (nargs > 3) {
-  replace.flag <- as.logical(as.numeric(args[[4]]))
+  replace.flag <- as.logical(args[[4]])
 }
 
 work.dir <- tempfile() # Default work directory
@@ -56,7 +56,7 @@ if (! file.exists(output.dir)) {
 }
 
 if (! replace.flag && file.exists(output.file)) {
-  cat("Output file exists: ",output.file,". Use replace.flag=1 to replace the file\n")
+  cat("Output file exists: ",output.file,". Use replace.flag=T to replace the file\n")
   q(save="no",status=0)
 }
 

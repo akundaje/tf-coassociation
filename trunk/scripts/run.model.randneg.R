@@ -1,9 +1,6 @@
 rm(list=ls())
 args <- commandArgs(trailingOnly=TRUE); # Read Arguments from command line
 nargs = length(args); # number of arguments
-# rm.target=F  # Set to true if you want to remove target variable from predictors
-# trim.target=T # Set to false if you want to use all rows in the co-binding matrix (if T, then rows with target.TF binding values < 0 are removed)
-# append.null=F # Set to T if you want to use randomized features as extra null model features
 
 # Print usage
 print.usage <- function(){
@@ -11,11 +8,13 @@ print.usage <- function(){
   cat("Samples a random negative set, learns a rulefit model, computes variable importance, interaction strength and all pairwise interactions\n")
   cat("   [mtrxRdata]: .Rdata file containing association matrix\n")
   cat("   [outputFile]: Path to output File\n")
-  cat("   [replaceFlag]: (OPTIONAL) If set to a 0, then if output file exits, the run will quit and not replace it, DEFAULT:0\n")
+  cat("   [replaceFlag]: (OPTIONAL) If set to a F, then if output file exits, the run will quit and not replace it, DEFAULT:F\n")
   cat("   [workingDir]: (OPTIONAL) working directory, DEFAULT: tempfile()\n")
   cat("   [rm.target]: (OPTIONAL) Set to T if you want to remove target variable, DEFAULT: F\n")
   cat("   [trim.target]: (OPTIONAL) Set to T if you want to remove rows for which target TF has values < 0, DEFAULT: F()\n")
   cat("   [append.null]: (OPTIONAL) Set to T if you want to append matrix with extra null randomized features, DEFAULT: F()\n")
+  cat("   [null.mode]: (OPTIONAL) Set to 0/1/2 if you want to randomize entire matrix, rows or cols DEFAULT: 2()\n")
+  cat("   [null.replace]: (OPTIONAL) Set to T if you want to replace the original matrix with the randomized one DEFAULT: F()\n")
 }
 
 if (nargs < 2) {
@@ -31,7 +30,7 @@ if (! file.exists(mtrx.rdata.file)) {
 
 output.file <- args[[2]] # Output file
 
-replace.flag <- 0 # do not replace existing file
+replace.flag <- F # do not replace existing file
 if (nargs > 2) {
   replace.flag <- as.logical(args[[3]])
 }
@@ -59,6 +58,17 @@ if (nargs > 6) {
   append.null <- as.logical(args[[7]])
 }
 
+null.mode <- 2
+if (nargs > 7) {
+  null.mode <- as.numeric(args[[8]])
+}
+
+null.replace <- F
+if (nargs > 8) {
+  null.replace <- as.logical(args[[9]])
+}
+
+
 source("assoc.matrix.utils.R")
 platform <- "linux"
 rfhome <- initialize.rulefit( work.dir=work.dir, rf.package.path=Sys.getenv("RULEFITBASE") )
@@ -70,8 +80,8 @@ if (! file.exists(output.dir)) {
 
 #output.file <- file.path(output.dir, sprintf("%s.randneg.rfresults.Rdata", mtrx.rdata.file.name))
 
-if (! replace.flag & file.exists(output.file)) {
-  cat("Output file exists: ",output.file,". Use replace.flag=1 to replace the file\n")
+if ((! replace.flag) & file.exists(output.file)) {
+  cat("Output file exists: ",output.file,". Use replace.flag=T to replace the file\n")
   q(save="no",status=0)
 }
 
@@ -98,7 +108,9 @@ cat("Computing model and variable importance ...\n")
 rulefit.results <- get.var.imp( sample.randneg.rulefit.model(assoc.data=assoc.data,
                                                              rm.target=rm.target,
                                                              trim.target=trim.target,
-                                                             append.null=append.null) )
+                                                             append.null=append.null,
+                                                             null.mode=null.mode,
+                                                             null.replace=null.replace) )
 save(list="rulefit.results",file=output.file)
 
 # Compute interaction strength

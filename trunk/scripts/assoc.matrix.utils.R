@@ -543,7 +543,7 @@ randomize.assoc.matrix <- function(assoc.data, num.rand=1, rand.dim=2){
   return(random.assoc.matrix)  
 }
 
-make.assoc.classf.rand.dataset <- function(assoc.data, rm.target=F, num.rand=1, trim.target=T, append.null=F, null.mode=2){
+make.assoc.classf.rand.dataset <- function(assoc.data, rm.target=F, num.rand=1, trim.target=T, append.null=F, null.mode=2, null.replace=F){
   # ===================================
   # Create classification dataset based on random negative set
   # Returns
@@ -559,17 +559,27 @@ make.assoc.classf.rand.dataset <- function(assoc.data, rm.target=F, num.rand=1, 
   # trim.target: T/F (If set to T then all rows with target TF values < 0 are removed)
   # append.null: T/F (If set to T then randomized versions of each feature (col) of the association matrix is added as an extra feature)
   # null.mode: 0/1/2 (0: randomize rows and columns, 1: randomize rows independently, 2: randomize columns independently)
+  # null.replace: T/F Set to T if you want to replace the true matrix with a randomized one
   
   if (is.character(assoc.data)) {
     load(assoc.data)    
   }
   
+  assoc.data$assoc.matrix$expr.val <- NULL # Remove expression column
+  
   # Append null
-  if (append.null) {
-    null.features <- randomize.assoc.matrix(assoc.data=assoc.data, rand.dim=null.mode)
-    rownames(null.features) <- rownames(assoc.data$assoc.matrix)
-    colnames(null.features) <- paste( colnames(null.features) , 'random' , sep="_" )
-    assoc.data$assoc.matrix <- cbind(assoc.data$assoc.matrix, null.features)
+  if (append.null | null.replace) {
+    if (! null.replace) {
+      null.features <- randomize.assoc.matrix(assoc.data=assoc.data, rand.dim=null.mode)
+      rownames(null.features) <- rownames(assoc.data$assoc.matrix)
+      colnames(null.features) <- paste( colnames(null.features) , 'random' , sep="_" )
+      assoc.data$assoc.matrix <- cbind(assoc.data$assoc.matrix, null.features)
+    } else {
+      null.features <- randomize.assoc.matrix(assoc.data=assoc.data, rand.dim=null.mode)
+      rownames(null.features) <- rownames(assoc.data$assoc.matrix)
+      colnames(null.features) <- colnames(assoc.data$assoc.matrix)
+      assoc.data$assoc.matrix <- null.features
+    }
   }
   
   # If trim.target remove rows for which target TF has negative values
@@ -589,8 +599,7 @@ make.assoc.classf.rand.dataset <- function(assoc.data, rm.target=F, num.rand=1, 
   x.vals <- filter.cols(x.vals) # Remove unwanted columns
   if (rm.target) {
     x.vals[ , assoc.data$target.name ] <- NULL # Remove target column
-  }
-  x.vals$expr.val <- NULL # Remove expression column
+  }    
   
   return( list(
     x.vals=x.vals,
@@ -1000,7 +1009,7 @@ get.all.partner.pair.interactions <- function(rulefit.results, use.import=T, int
   return(rulefit.results)
 }
 
-sample.randneg.rulefit.model <- function(assoc.data , rm.target=F, trim.target=T, append.null=F, null.mode=2){
+sample.randneg.rulefit.model <- function(assoc.data , rm.target=F, trim.target=T, append.null=F, null.mode=2, null.replace=F){
   # ===================================
   # Sample a rulefit model
   # (1) Creates a random negative set and returns a rulefit model for it
@@ -1017,8 +1026,14 @@ sample.randneg.rulefit.model <- function(assoc.data , rm.target=F, trim.target=T
   # trim.target: T/F (If set to T then all rows with target TF values < 0 are removed)
   # append.null: T/F (If set to T then randomized versions of each feature (col) of the association matrix is added as an extra feature)
   # null.mode: 0/1/2 (0: randomize rows and columns, 1: randomize rows independently, 2: randomize columns independently)
+  # null.replace: T/F Set to T if you want to replace the true matrix with a randomized one  
   
-  assoc.classf.data <- make.assoc.classf.rand.dataset(assoc.data, rm.target=rm.target, trim.target=trim.target, append.null=append.null, null.mode=null.mode)
+  assoc.classf.data <- make.assoc.classf.rand.dataset(assoc.data, 
+                                                      rm.target=rm.target,
+                                                      trim.target=trim.target,
+                                                      append.null=append.null,
+                                                      null.mode=null.mode,
+                                                      null.replace=null.replace)
   ntrue <- (assoc.classf.data$y.vals == 1)
   rfmod <- run.rulefit(assoc.classf.data)
   
@@ -1667,44 +1682,77 @@ plot.pairwise <- function(rulefit.results, output.dir=NULL, ext="png", filt.thre
   }
 }
 
-# plot.pairwise.matrix <- function(rulefit.results, output.dir=NULL, output.filename=NULL, ext="png", filt.thresh=1e-7){
-#   # ===================================
-#   # Plots interaction strength
-#   # Takes as input rulefit.results (list) OR
-#   # Rdata file name (string) that contains rulefit.results 
-#   # ===================================  
-#   # rulefit.results: Rdata file name containing rulefit.results list OR the rulefit.results LIST
-#   # output.dir: directory where you want to save all figure
-#   # output.filename: OPTIONAL file name (no path)
-#   # ext: OPTIONAL plot type (png/pdf)
-#   
-#   # Load rulefit.results if input is a data list
-#   if (is.character(rulefit.results)) {
-#     load(rulefit.results)    
-#   }
-#   target.name <- rulefit.results$dataset$target.name
-#   plot.title <- sprintf("Interaction Strength | %s",target.name)
-#   
-#   if ( !is.null(output.dir) ) {
-#     output.dir <- file.path(output.dir,target.name) 
-#     # Create output directory if it doesnt exist
-#     if (!file.exists(output.dir)){
-#       dir.create(output.dir,recursive=T)
-#     }  
-#   
-#     if (is.null(output.filename)) {
-#       output.filename <- file.path( output.dir , sprintf("int.strength.%s.%s",target.name,ext) )
-#     } else {
-#       output.filename <- file.path( output.dir , get.file.parts(output.filename)$fullname )
-#     }
-#   }
-# 
-#   if (! is.null(filt.thresh) ) {
-#     rulefit.results$int.strength <- rulefit.results$int.strength[, (rulefit.results$int.strength >= filt.thresh) ]
-#   }
-#   
-#   make.barplot( as.numeric(rulefit.results$int.strength), labels=toupper(colnames(rulefit.results$int.strength)), title.name=plot.title , to.file=output.filename )
-# }
+plot.pairwise.matrix <- function(rulefit.results, output.dir, output.filename=NA, ext="pdf", filter.thresh=1e-7){
+  # ===================================
+  # Plots interaction strength
+  # Takes as input rulefit.results (list) OR
+  # Rdata file name (string) that contains rulefit.results 
+  # ===================================  
+  # rulefit.results: Rdata file name containing rulefit.results list OR the rulefit.results LIST
+  # output.dir: directory where you want to save all figure
+  # output.filename: OPTIONAL file name (no path)
+  # ext: OPTIONAL plot type (png/pdf)
+
+  # Load rulefit.results if input is a character vector
+  if (is.character(rulefit.results)) {
+    load(rulefit.results)    
+  }
+  
+  target.name <- rulefit.results$dataset$target.name
+  output.dir <- file.path(output.dir,target.name) 
+  # Create output directory if it doesnt exist
+  if (!file.exists(output.dir)){
+    dir.create(output.dir, recursive=T)
+  }
+
+  plot.title <- sprintf("Conditional Pairwise Interactions | %s",target.name)
+
+  if (is.na(output.filename)) {
+    output.filename <- file.path( output.dir , sprintf("cond.pairwise.int.matrix.%s.%s",target.name,ext) )
+  } else {
+    output.filename <- file.path( output.dir , get.file.parts(output.filename)$fullname )
+  }
+  
+  val.data <- rulefit.results$pair.interactions
+  val.data <- filter.cols( filter.rows(val.data) )
+  rownames(val.data) <- standardize.name(rownames(val.data))
+  colnames(val.data) <- standardize.name(colnames(val.data))
+  
+#   plot.heatmap( data=val.data,
+#                 show.dendro="none",
+#                 to.file=output.filename,
+#                 row.title="Transcription Factors",
+#                 col.title="Transcription Factors",
+#                 title.name="",
+#                 filt.thresh=filter.thresh,
+#                 pseudo.count=1e-30,
+#                 logval=F,
+#                 replace.diag=T,
+#                 replace.na=T,
+#                 num.breaks=255,
+#                 #clust.method="ward",
+#                 clust.method="single",
+#                 break.lowerbound=1e-3,
+#                 break.type="quantile")
+  
+  plot.heatmap( data=val.data,
+                use.as.dist=T,
+                show.dendro="none",
+                to.file=output.filename,
+                row.title="Transcription Factors",
+                col.title="Transcription Factors",
+                title.name="",
+                filt.thresh=filter.thresh,
+                pseudo.count=0,
+                logval=T,
+                replace.diag=T,
+                replace.na=T,
+                num.breaks=255,
+                #clust.method="complete",
+                clust.method="ward",
+                break.lowerbound=4.5,                  
+                break.type="linear")  
+}
 
 plot.singleplot <- function(rulefit.results, output.dir=NULL, ext="png", filt.thresh=1e-7){
   # ===================================

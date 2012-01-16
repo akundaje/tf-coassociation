@@ -75,9 +75,9 @@ for posFile in $(find ${POSDIR} -regextype posix-extended -type f -regex ${IREGE
       then
       if [[ ${DEFMEM} -eq 0 ]]
 	  	then
-	  	bsub -g ${JOBGROUPID} -q research-rh6 -W 94:00 -M "${MEM}" -R "rusage[mem=${MEM}]" -o ${logFile} -e ${errFile} "mkdir ${TMP_DIR} ; Rscript ${SCRIPT_NAME} ${posFile} ${negFile} ${OUTFILE} 0 ${TMP_DIR} ;  rm -rf ${TMP_DIR}"
+	  	bsub -g ${JOBGROUPID} -q research-rh6 -W 94:00 -M "${MEM}" -R "rusage[mem=${MEM}]" -o ${logFile} -e ${errFile} "mkdir ${TMP_DIR} ; Rscript ${SCRIPT_NAME} ${posFile} ${negFile} ${OUTFILE} F ${TMP_DIR} ;  rm -rf ${TMP_DIR}"
       else
-	  	bsub -g ${JOBGROUPID} -q research-rh6 -W 94:00 -o ${logFile} -e ${errFile} "mkdir ${TMP_DIR} ; Rscript ${SCRIPT_NAME} ${posFile} ${negFile} ${OUTFILE} 0 ${TMP_DIR} ;  rm -rf ${TMP_DIR}"
+	  	bsub -g ${JOBGROUPID} -q research-rh6 -W 94:00 -o ${logFile} -e ${errFile} "mkdir ${TMP_DIR} ; Rscript ${SCRIPT_NAME} ${posFile} ${negFile} ${OUTFILE} F ${TMP_DIR} ;  rm -rf ${TMP_DIR}"
       fi
   fi
   while [[ $(bjobs -r -g "${JOBGROUPID}" | wc -l | awk '{print $1}') -gt 500 ]]
