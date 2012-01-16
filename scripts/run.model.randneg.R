@@ -1,8 +1,9 @@
 rm(list=ls())
 args <- commandArgs(trailingOnly=TRUE); # Read Arguments from command line
 nargs = length(args); # number of arguments
-rm.target=F  # Set to true if you want to remove target variable from predictors
-trim.target=T # Set to false if you want to use all rows in the co-binding matrix (if T, then rows with target.TF binding values < 0 are removed)
+# rm.target=F  # Set to true if you want to remove target variable from predictors
+# trim.target=T # Set to false if you want to use all rows in the co-binding matrix (if T, then rows with target.TF binding values < 0 are removed)
+# append.null=F # Set to T if you want to use randomized features as extra null model features
 
 # Print usage
 print.usage <- function(){
@@ -12,6 +13,9 @@ print.usage <- function(){
   cat("   [outputFile]: Path to output File\n")
   cat("   [replaceFlag]: (OPTIONAL) If set to a 0, then if output file exits, the run will quit and not replace it, DEFAULT:0\n")
   cat("   [workingDir]: (OPTIONAL) working directory, DEFAULT: tempfile()\n")
+  cat("   [rm.target]: (OPTIONAL) Set to T if you want to remove target variable, DEFAULT: F\n")
+  cat("   [trim.target]: (OPTIONAL) Set to T if you want to remove rows for which target TF has values < 0, DEFAULT: F()\n")
+  cat("   [append.null]: (OPTIONAL) Set to T if you want to append matrix with extra null randomized features, DEFAULT: F()\n")
 }
 
 if (nargs < 2) {
@@ -38,6 +42,21 @@ if (nargs > 3) {
 }
 if (! file.exists(work.dir)) {
   dir.create(work.dir)
+}
+
+rm.target <- F
+if (nargs > 4) { # rm.target
+  rm.target <- as.logical(args[[5]])
+}
+
+trim.target <- F
+if (nargs > 5) { # trim.target
+  trim.target <- as.logical(args[[6]])
+}
+
+append.null <- F
+if (nargs > 6) {
+  append.null <- as.logical(args[[7]])
 }
 
 source("assoc.matrix.utils.R")
@@ -76,7 +95,10 @@ load(mtrx.rdata.file)
 #   rulefit.results$pair.interactions
 cat("Computing model and variable importance ...\n")
 #rulefit.results <- get.average.randneg.model(assoc.data,rm.target=rm.target)
-rulefit.results <- get.var.imp( sample.randneg.rulefit.model(assoc.data=assoc.data,rm.target=rm.target,trim.target=trim.target) )
+rulefit.results <- get.var.imp( sample.randneg.rulefit.model(assoc.data=assoc.data,
+                                                             rm.target=rm.target,
+                                                             trim.target=trim.target,
+                                                             append.null=append.null) )
 save(list="rulefit.results",file=output.file)
 
 # Compute interaction strength

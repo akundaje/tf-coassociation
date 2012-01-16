@@ -4,7 +4,7 @@
 if [[ "$#" -lt 4 ]]
     then
     echo $(basename $0) 1>&2
-    echo "Computes percentage tags in peaks as a measure of IP enrichment" 1>&2
+    echo "Submits jobs for comparing coassociation matrices to randomized versions using datasets in a particular directory" 1>&2
     echo "USAGE:" 1>&2
     echo "$(basename $0) [scriptName] [inputDir] [inputRegex] [outputDir]" 1>&2
     echo "   [scriptName]: script to be parallelized" 1>&2

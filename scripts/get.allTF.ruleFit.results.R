@@ -200,8 +200,8 @@ if (nrow(all.vi.matrix) > 0) {
                num.breaks=255,
                clust.method="ward",
                #dist.metric="spearman",
-#                break.lowerbound=20,
-#                break.upperbound=80,                 
+               #break.lowerbound=30,
+               #break.upperbound=80,                 
                break.type="linear")
 }
 

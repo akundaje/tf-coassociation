@@ -176,7 +176,10 @@ filter.cols <- function(data,rm.treatments=F) {
                 "K562POL2S2",
                 "HepG2HEY1",
                 "HeLaS3GCN5",
-                "HeLaS3SPT20",                
+                "HeLaS3SPT20",
+                "Helas3CmycIFNg6h",
+                "Helas3CmycIFNg30",
+                "Helas3Cmyc",
                 "expr.val")
   rm.idx <- match(rem.cols, colnames(data))
   rm.idx <- rm.idx[! is.na(rm.idx)]
@@ -204,6 +207,9 @@ filter.rows <- function(data) {
                 "HepG2HEY1",
                 "HeLaS3GCN5",
                 "HeLaS3SPT20",
+                "Helas3CmycIFNg6h",
+                "Helas3CmycIFNg30",
+                "Helas3Cmyc",                
                 "expr.val")
   rm.idx <- match(rem.rows, rownames(data))
   rm.idx <- rm.idx[! is.na(rm.idx)]
@@ -319,7 +325,7 @@ read.assoc.file <- function( assoc.file, std.thresh=NA, use.relaxed=T ) {
   # Extract target column
   target.idx <- ( colnames(assoc.matrix) %in% target.name ) # Col index containing target.name
   target <- assoc.matrix[ , target.idx ] # target column
-  assoc.matrix <- assoc.matrix[ , !target.idx ] # remove target column
+  assoc.matrix <- assoc.matrix[ , !target.idx ] # remove target column    
 
   # Processed relaxed norm peaks
   if (!use.relaxed) {
@@ -338,6 +344,17 @@ read.assoc.file <- function( assoc.file, std.thresh=NA, use.relaxed=T ) {
   # Set target column as first column in partners matrix
   assoc.matrix <- cbind(target , assoc.matrix)
   colnames(assoc.matrix)[1] <- target.name
+  
+  # Reorder PeakIDs if they dont match target ranks
+  peak.Ids <- as.numeric( gsub( '(^.*Pk_)|(_[^_]+$)' , '' , rownames(assoc.matrix) ) ) # Convert PeakIds to numbers
+  order.target <- order(assoc.matrix[,target.name])
+  n.rows <- length(peak.Ids)
+  if ( (peak.Ids[1] == order.target[1]) & (peak.Ids[n.rows] == order.target[n.rows] ) ) {
+    cat("Reversing labels\n")
+    rownames(assoc.matrix) <- rev(rownames(assoc.matrix))
+    peak.Ids <- as.numeric( gsub( '(^.*Pk_)|(_[^_]+$)' , '' , rownames(assoc.matrix) ) ) # Convert PeakIds to numbers
+    assoc.matrix <- assoc.matrix[ order( peak.Ids ) , ] # reorder rows by PeakId
+  }  
   
   # Remove bad columns
   assoc.matrix <- filter.cols(data=assoc.matrix)
@@ -410,6 +427,29 @@ batch.read.assoc.file.to.Rdata <- function( assoc.dir , expr.file=NULL , output.
   }
 }
 
+truncate.OF.using.OA <- function( oa.dir, of.dir ) {
+  # Use peak ids from OA file to truncate OF files
+  oa.names <- list.files(oa.dir,pattern="*.mtrx.Rdata",full.names=T)
+  of.names <- file.path( of.dir, gsub("\\.OA\\.",".OF.",basename(oa.names)) )
+  count <- 0
+  for (i in oa.names) {
+    count <- count + 1
+    if ( !file.exists(of.names[count]) ) {
+      next
+    } else {
+      cat(sprintf("Processing %s\n",basename(i)))
+      load(i)
+      cat(dim(assoc.data$assoc.matrix),"\n")
+      oa.peak.ids <- gsub("_OA","_OF",rownames(assoc.data$assoc.matrix))
+      load(of.names[count])
+      of.peak.ids <- rownames(assoc.data$assoc.matrix)
+      assoc.data$assoc.matrix <- assoc.data$assoc.matrix[(of.peak.ids %in% oa.peak.ids) , ]
+      cat(dim(assoc.data$assoc.matrix),"\n")
+      save(list="assoc.data",file=of.names[count])
+    }
+  }
+}
+
 update.Rdata.with.expr.zscr <- function(assoc.Rdata.file, expr.zscr.file) {
   # ===================================
   # Update Rdata file with expression z-scores
@@ -475,12 +515,23 @@ randomize.assoc.matrix <- function(assoc.data, num.rand=1, rand.dim=2){
     
   } else {
     
-    random.assoc.matrix <- as.data.frame( apply( assoc.data$assoc.matrix , rand.dim , sample ) ) # apply the 'sample' function to each column of assoc.matrix
+    random.assoc.matrix <- apply( assoc.data$assoc.matrix , rand.dim , sample ) # apply the 'sample' function to each row/column of assoc.matrix
+    if (rand.dim == 1) {
+      random.assoc.matrix <- as.data.frame(t(random.assoc.matrix))
+    } else {
+      random.assoc.matrix <- as.data.frame(random.assoc.matrix)
+      rownames(random.assoc.matrix) <- rownames(assoc.data$assoc.matrix)
+    }
     rownames(random.assoc.matrix) <- paste( rownames(random.assoc.matrix) , 'random' , sep="_" ) # Add '_random' suffix to each row name
     colnames(random.assoc.matrix) <- colnames(assoc.data$assoc.matrix)
     if (num.rand > 1) {
       for (i in c(2:num.rand)) {
-        temp.matrix <- as.data.frame( apply( assoc.data$assoc.matrix , rand.dim , sample ) )
+        temp.matrix <- apply( assoc.data$assoc.matrix , rand.dim , sample )
+        if (rand.dim == 1) {
+          temp.matrix <- as.data.frame(t(temp.matrix))
+        } else {
+          temp.matrix <- as.data.frame(temp.matrix)
+        }        
         rownames(temp.matrix) <- paste( rownames(temp.matrix) , 'random' , sep="_" ) # Add '_random' suffix to each row name
         colnames(temp.matrix) <- colnames(assoc.data$assoc.matrix)
         random.assoc.matrix <- rbind( random.assoc.matrix, temp.matrix  )
@@ -492,7 +543,7 @@ randomize.assoc.matrix <- function(assoc.data, num.rand=1, rand.dim=2){
   return(random.assoc.matrix)  
 }
 
-make.assoc.classf.rand.dataset <- function(assoc.data, rm.target=F, num.rand=1, trim.target=T){
+make.assoc.classf.rand.dataset <- function(assoc.data, rm.target=F, num.rand=1, trim.target=T, append.null=F, null.mode=2){
   # ===================================
   # Create classification dataset based on random negative set
   # Returns
@@ -506,9 +557,19 @@ make.assoc.classf.rand.dataset <- function(assoc.data, rm.target=F, num.rand=1, 
   # rm.target: if set to TRUE, target column is removed
   # num.rand: number of random instantiations of the matrix that should be row bound to give the final random matrix
   # trim.target: T/F (If set to T then all rows with target TF values < 0 are removed)
+  # append.null: T/F (If set to T then randomized versions of each feature (col) of the association matrix is added as an extra feature)
+  # null.mode: 0/1/2 (0: randomize rows and columns, 1: randomize rows independently, 2: randomize columns independently)
   
   if (is.character(assoc.data)) {
     load(assoc.data)    
+  }
+  
+  # Append null
+  if (append.null) {
+    null.features <- randomize.assoc.matrix(assoc.data=assoc.data, rand.dim=null.mode)
+    rownames(null.features) <- rownames(assoc.data$assoc.matrix)
+    colnames(null.features) <- paste( colnames(null.features) , 'random' , sep="_" )
+    assoc.data$assoc.matrix <- cbind(assoc.data$assoc.matrix, null.features)
   }
   
   # If trim.target remove rows for which target TF has negative values
@@ -939,7 +1000,7 @@ get.all.partner.pair.interactions <- function(rulefit.results, use.import=T, int
   return(rulefit.results)
 }
 
-sample.randneg.rulefit.model <- function(assoc.data , rm.target=F, trim.target=T){
+sample.randneg.rulefit.model <- function(assoc.data , rm.target=F, trim.target=T, append.null=F, null.mode=2){
   # ===================================
   # Sample a rulefit model
   # (1) Creates a random negative set and returns a rulefit model for it
@@ -954,8 +1015,10 @@ sample.randneg.rulefit.model <- function(assoc.data , rm.target=F, trim.target=T
   # assoc.data$target.name
   # rm.target: if set to TRUE then target TF is not used in constructing the model
   # trim.target: T/F (If set to T then all rows with target TF values < 0 are removed)
+  # append.null: T/F (If set to T then randomized versions of each feature (col) of the association matrix is added as an extra feature)
+  # null.mode: 0/1/2 (0: randomize rows and columns, 1: randomize rows independently, 2: randomize columns independently)
   
-  assoc.classf.data <- make.assoc.classf.rand.dataset(assoc.data, rm.target=rm.target, trim.target=trim.target)
+  assoc.classf.data <- make.assoc.classf.rand.dataset(assoc.data, rm.target=rm.target, trim.target=trim.target, append.null=append.null, null.mode=null.mode)
   ntrue <- (assoc.classf.data$y.vals == 1)
   rfmod <- run.rulefit(assoc.classf.data)
   
@@ -1154,21 +1217,22 @@ plot.heatmap <- function(data,
   
   # Remove columns with all NAs
   #data <- filter.cols(data)
-  na.idx <- apply( data , 2 , function(x) all(is.na(x)) )
-  data <- data[ , !na.idx]
-  # Remove rows with all NAs
-  na.idx <- apply( data , 1 , function(x) all(is.na(x)) )
-  data <- data[!na.idx, ]  
-
-  # Remove columns with all very small values
-  if (! is.na(filt.thresh) ) {
-    na.idx <- apply( data , 2 , function(x) all((x<filt.thresh),na.rm=T) )
+  if (!symm.cluster) {
+    na.idx <- apply( data , 2 , function(x) all(is.na(x)) )
     data <- data[ , !na.idx]
-    # Remove rows with all very small values
-    na.idx <- apply( data , 1 , function(x) all((x<filt.thresh),na.rm=T) )
-    data <- data[!na.idx, ]
-  }
+    # Remove rows with all NAs
+    na.idx <- apply( data , 1 , function(x) all(is.na(x)) )
+    data <- data[!na.idx, ]  
   
+    # Remove columns with all very small values
+    if (! is.na(filt.thresh) ) {
+      na.idx <- apply( data , 2 , function(x) all((x<filt.thresh),na.rm=T) )
+      data <- data[ , !na.idx]
+      # Remove rows with all very small values
+      na.idx <- apply( data , 1 , function(x) all((x<filt.thresh),na.rm=T) )
+      data <- data[!na.idx, ]
+    }
+  }
   data.size <- dim(data)
   if (data.size[[1]] < 1) {return()}
   
