@@ -16,9 +16,11 @@ if [[ "$#" -lt 4 ]]
     exit 1 
 fi
 
-RM_TARGET=F
-TRIM_TARGET=F
-APPEND_NULL=T
+RM_TARGET='F'
+TRIM_TARGET='F'
+APPEND_NULL='T'
+NULL_MODE='2'
+NULL_REPLACE='F'
 
 SCRIPT_NAME=$1
 if [[ ! -e ${SCRIPT_NAME} ]]
@@ -74,10 +76,10 @@ for iFile in $(find ${IDIR} -regextype posix-extended -type f -regex ${IREGEX})
 	then
 	if [[ ${DEFMEM} -eq 0 ]]
 	    then
-	    bsub -g ${JOBGROUPID} -q research-rh6 -W 94:00 -M ${MEM} -R "rusage[mem=${MEM}]" -o ${logFile} -e ${errFile} "mkdir ${TMP_DIR} ; Rscript ${SCRIPT_NAME} ${iFile} ${OUTFILE} 0 ${TMP_DIR} ${RM_TARGET} ${TRIM_TARGET} ${APPEND_NULL} ; rm -rf ${TMP_DIR}"
+	    bsub -g ${JOBGROUPID} -q research-rh6 -W 94:00 -M ${MEM} -R "rusage[mem=${MEM}]" -o ${logFile} -e ${errFile} "mkdir ${TMP_DIR} ; Rscript ${SCRIPT_NAME} ${iFile} ${OUTFILE} F ${TMP_DIR} ${RM_TARGET} ${TRIM_TARGET} ${APPEND_NULL} ${NULL_MODE} ${NULL_REPLACE} ; rm -rf ${TMP_DIR}"
 	else
-	    bsub -g ${JOBGROUPID} -q research-rh6 -W 94:00 -o ${logFile} -e ${errFile} "mkdir ${TMP_DIR} ; Rscript ${SCRIPT_NAME} ${iFile} ${OUTFILE} 0 ${TMP_DIR} ${RM_TARGET} ${TRIM_TARGET}\
- ${APPEND_NULL} ; rm -rf ${TMP_DIR}"
+	    bsub -g ${JOBGROUPID} -q research-rh6 -W 94:00 -o ${logFile} -e ${errFile} "mkdir ${TMP_DIR} ; Rscript ${SCRIPT_NAME} ${iFile} ${OUTFILE} F ${TMP_DIR} ${RM_TARGET} ${TRIM_TARGET}\
+ ${APPEND_NULL} ${NULL_MODE} ${NULL_REPLACE} ; rm -rf ${TMP_DIR}"
 	fi
     fi
   done
