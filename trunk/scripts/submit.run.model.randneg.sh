@@ -85,7 +85,7 @@ for iFile in $(find ${IDIR} -regextype posix-extended -type f -regex ${IREGEX})
   done
   while [[ $(bjobs -r -g "${JOBGROUPID}" | wc -l | awk '{print $1}') -gt 500 ]]
     do
-    sleep 3m
+    sleep 1m
   done
   #sleep 15s
 done
