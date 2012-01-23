@@ -874,7 +874,7 @@ get.var.imp <- function(rulefit.results, class=1){
   return(rulefit.results)
 }
 
-get.null.models <- function(rulefit.results, ntimes=50) {
+get.null.models <- function(rulefit.results, ntimes=5) {
   # Computes null models for a rulefit model
   # rulefit.results$rfmod
   # rulefit.results$dataset
@@ -942,8 +942,8 @@ get.int.strength <- function( rulefit.results , plot=FALSE, use.null=F) {
     rulefit.results$int.strength <- as.data.frame( t(temp.int$int) )
     colnames(rulefit.results$int.strength) <- partner.names        
     
-    rulefit.results$int.strength.null.ave <- as.data.frame( t(temp.int$nullave) )
-    colnames(rulefit.results$int.strength.null.ave) <- partner.names
+    rulefit.results$int.strength.null.mean <- as.data.frame( t(temp.int$nullave) )
+    colnames(rulefit.results$int.strength.null.mean) <- partner.names
     
     rulefit.results$int.strength.null.std <- as.data.frame( t(temp.int$nullstd) )
     colnames(rulefit.results$int.strength.null.std) <- partner.names            
@@ -1063,7 +1063,7 @@ get.partner.pair.interactions <- function( rulefit.results,
   
   if (use.null) {
     temp.int2var <- twovarint(var.idx, other.idx, plot=FALSE , import=use.import, null.mods=rulefit.results$null.models)
-    int2var <- int2var$int
+    int2var <- temp.int2var$int
   } else {
     int2var <- twovarint(var.idx, other.idx, plot=FALSE , import=use.import) 
   }  
@@ -1278,7 +1278,7 @@ learn.posneg.rulefit.model <- function(pos.assoc.data , neg.assoc.data, rm.targe
     
   assoc.classf.data <- make.assoc.classf.posneg.dataset(pos.assoc.data, neg.assoc.data, rm.target)
   ntrue <- (assoc.classf.data$y.vals == 1)
-  rfmod <- run.rulefit(assoc.classf.data)
+  rfmod <- run.rulefit(assoc.classf.data,corr.penalty=1)
   
   # Create place holder for variable importance
   partner.names <- colnames(assoc.classf.data$x.vals)
