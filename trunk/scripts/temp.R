@@ -110,9 +110,10 @@ rfhome <- initialize.rulefit(rf.package.path='/media/fusion10/work/encode/learni
 #   }
 # }
 
-for (cell in c("K562")) {
-  input.dir <- sprintf("/media/fusion10/work/encode/learning/combinatorics/results/TFCentric/randneg_iter/%s/average/OA_max_tree6_average",cell)
-  output.dir <- sprintf("/media/fusion10/work/encode/learning/combinatorics/figures/TFCentric/randneg_iter/%s/OA_max_tree6_average",cell)
+for (cell in c("GM12878","H1hesc","Hepg2","Hela-S3")) {
+# for (cell in c("K562")) {  
+  input.dir <- sprintf("/media/fusion10/work/encode/learning/combinatorics/results/TFCentric/randneg_iter/%s/average/null_append_OA_max_tree6_average",cell)
+  output.dir <- sprintf("/media/fusion10/work/encode/learning/combinatorics/figures/TFCentric/randneg_iter/%s/null_append_OA_max_tree6_average",cell)
   dir.create(path=output.dir,recursive=T)
   for (i in list.files(path=input.dir,pattern=".*Rdata$",full.names=T)) {
     tryCatch( plot.average.vi(rulefit.results=i,output.dir=output.dir,thresh=5), error = function(e) cat("ERROR\n"))
