@@ -84,12 +84,12 @@ save(list="rulefit.results",file=output.file)
 
 # # Compute interaction strength
 cat("Computing global interaction strength ...\n")
-rulefit.results <- get.int.strength( rulefit.results )
+rulefit.results <- get.int.strength( rulefit.results, use.null=T )
 save(list="rulefit.results",file=output.file)
 
 # Compute pairwise interactions
 cat("Computing all pairwise interactions\n")
-rulefit.results <- get.all.partner.pair.interactions(rulefit.results, use.import=T)
+rulefit.results <- get.all.partner.pair.interactions(rulefit.results, use.import=T, use.null=T)
 save(list="rulefit.results",file=output.file)
 
 # Compute cross-validation error

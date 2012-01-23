@@ -841,6 +841,10 @@ get.var.imp <- function(rulefit.results, class=1){
   # rulefit.results$int.strength
   # rulefit.results$pair.interactions
   # class: 1/0/-1, 1: positive class, -1: negative class, 0: all examples, or a specific set of examples
+  
+  if (is.character(rulefit.results)) {
+    load(rulefit.results)
+  }
 
   if (length(class)==1) {
     if (class==1){
@@ -870,7 +874,29 @@ get.var.imp <- function(rulefit.results, class=1){
   return(rulefit.results)
 }
 
-get.int.strength <- function( rulefit.results , plot=FALSE ) {
+get.null.models <- function(rulefit.results, ntimes=50) {
+  # Computes null models for a rulefit model
+  # rulefit.results$rfmod
+  # rulefit.results$dataset
+  # rulefit.results$vi
+  # rulefit.results$int.strength
+  # rulefit.results$pair.interactions
+  # Adds rulefit.results$null.models
+  if (is.character(rulefit.results)) {
+    load(rulefit.results)
+  }
+  
+  rulefit.results <- restore.rf.model(rulefit.results)
+  
+  if ( any( names(rulefit.results) == "null.models" ) ) {
+    rulefit.results$null.models <- intnull(ntimes, null.mods=rulefit.results$null.models, quiet=T)
+  } else {
+    rulefit.results$null.models <- intnull(ntimes, quiet=T)
+  }    
+  return(rulefit.results)
+}
+
+get.int.strength <- function( rulefit.results , plot=FALSE, use.null=F) {
   # ===================================
   # Add interaction strengths to rulefit results
   # Returns
@@ -884,11 +910,49 @@ get.int.strength <- function( rulefit.results , plot=FALSE ) {
   # rulefit.results$dataset
   # rulefit.results$vi
   # rulefit.results$int.strength
+  # rulefit.results$int.strength.null.ave (OPTIONAL)
+  # rulefit.results$int.strength.null.std (OPTIONAL)
   # rulefit.results$pair.interactions
+  # rulefit.results$pair.interactions.null.mean (OPTIONAL)
+  # rulefit.results$pair.interactions.null.std (OPTIONAL)
+  # rulefit.results$null.models (OPTIONAL)
+  
   # plot: TRUE/FALSE/filename, filename: will save interaction strength plot to file
   
-  partner.names <- colnames( rulefit.results$dataset$x.vals )  
-  int.strength <- interact( partner.names , plot=F )
+  # Load file is rulefit.results is a file name
+  if (is.character(rulefit.results)) {
+    load(rulefit.results)
+  }
+  
+  partner.names <- colnames( rulefit.results$dataset$x.vals )
+    
+  if (use.null) {
+    
+    # Check if null models are computed. If not compute them
+    if ( any( names(rulefit.results) == "null.models" ) ) {
+      if (is.na(rulefit.results$null.models)) {
+        rulefit.results <- get.null.models(rulefit.results)
+      }
+    } else {
+      rulefit.results <- get.null.models(rulefit.results)
+    }
+    
+    temp.int <- interact( partner.names, null.mods <- rulefit.results$null.models, plot=F)
+    
+    rulefit.results$int.strength <- as.data.frame( t(temp.int$int) )
+    colnames(rulefit.results$int.strength) <- partner.names        
+    
+    rulefit.results$int.strength.null.ave <- as.data.frame( t(temp.int$nullave) )
+    colnames(rulefit.results$int.strength.null.ave) <- partner.names
+    
+    rulefit.results$int.strength.null.std <- as.data.frame( t(temp.int$nullstd) )
+    colnames(rulefit.results$int.strength.null.std) <- partner.names            
+    
+  } else {
+    int.strength <- interact( partner.names , plot=F ) 
+    rulefit.results$int.strength <- as.data.frame(t(int.strength))
+    colnames(rulefit.results$int.strength) <- partner.names    
+  }  
   
   if (is.logical(plot)) {
     if (plot) {
@@ -899,42 +963,78 @@ get.int.strength <- function( rulefit.results , plot=FALSE ) {
       title.name <- paste("PartnerTF Interaction strength:", rulefit.results$dataset$target.name)
       make.barplot( int.strength , partner.names , title.name=title.name , to.file=plot)    
   }
-  
-  #partner.names <- colnames(rulefit.results$int.strength)
-  rulefit.results$int.strength <- as.data.frame(t(int.strength))
-  colnames(rulefit.results$int.strength) <- partner.names
-  
+    
   return(rulefit.results)
 }
 
-get.partner.pair.interactions <- function( rulefit.results , var.rank=1 , var.idx=NULL, plot=FALSE, use.import=T, int.thresh=1e-7, pred.optim=50 ){
+get.partner.pair.interactions <- function( rulefit.results,
+                                           var.rank=1,
+                                           var.idx=NULL,
+                                           plot=FALSE,
+                                           use.import=T,
+                                           int.thresh=1e-7,
+                                           pred.optim=50,
+                                           use.null=F ){
   # ===================================
   # Get pairwise factor interactions for a particular partner
   # ===================================  
   # rulefit.results$rfmod
   # rulefit.results$dataset
   # rulefit.results$vi
-  # rulefit.results$int.strength
+  # rulefit.results$int.strength  
+  # rulefit.results$int.strength.null.ave (OPTIONAL)
+  # rulefit.results$int.strength.null.std (OPTIONAL)
   # rulefit.results$pair.interactions
+  # rulefit.results$pair.interactions.null.mean (OPTIONAL)
+  # rulefit.results$pair.interactions.null.std (OPTIONAL)
+  # rulefit.results$null.models (OPTIONAL)
+  
   # var.rank: rank (based on interaction strength) of partner TF to use to get interactions (ONLY used if var.idx=NULL)
   # var.idx: index or name of partner TF to use to get interactions
   # plot: TRUE/FALSE/filename, filename: will save interaction strength plot to file
   # use.import: T/F scales the interaction strengths by variable importance
   # pred.optim: if number of predictors is greater than pred.optim then only compute pairwise interaction scores for predictors with interaction potential > int.thresh
   # int.thresh: interaction threshold to use to consider pairwise interactions
+  # use.null: if set to T then null models will be used to compute null interaction scores
+
+  if (is.character(rulefit.results)) {
+    load(rulefit.results)
+  }
   
   partner.names <- colnames( rulefit.results$dataset$x.vals )
   
   # Initialize pair.interactions if necessary
-  if ( ! any( grepl( pattern="pair\\.interactions", x=names(rulefit.results) ) ) ) {
+  if ( ! any( names(rulefit.results) == "pair.interactions" ) ) {
     rulefit.results$pair.interactions <- data.frame(matrix( data=NA , nrow=length(partner.names) , ncol=length(partner.names) ) )
     rownames(rulefit.results$pair.interactions) <- partner.names
     colnames(rulefit.results$pair.interactions) <- partner.names      
   }
-  
+
   # Compute interaction strengths if int.strength is all NA
   if ( all( is.na(rulefit.results$int.strength) ) ) {
-    rulefit.results <- get.int.strength(rulefit.results)
+    rulefit.results <- get.int.strength(rulefit.results, use.null=use.null)    
+  }
+  
+  # Initialize rulefit.results$pair.interactions.null.mean and rulefit.results$pair.interactions.null.std if required  
+  if (use.null) {    
+    # Compute null models if required
+    if ( any( names(rulefit.results) == "null.models" ) ) {
+      if (is.na(rulefit.results$null.models)) {
+        rulefit.results <- get.null.models(rulefit.results)
+      }
+    } else {
+      rulefit.results <- get.null.models(rulefit.results)
+    }
+    
+    # Initialize rulefit.results$pair.interactions.null.mean
+    if ( ! any( names(rulefit.results) == "pair.interactions.null.mean" ) ) {
+      rulefit.results$pair.interactions.null.mean <- rulefit.results$pair.interactions
+    }
+    
+    # Initialize rulefit.results$pair.interactions.null.std
+    if ( ! any( names(rulefit.results) == "pair.interactions.null.std" ) ) {
+      rulefit.results$pair.interactions.null.std <- rulefit.results$pair.interactions
+    }    
   }
   
   opt.order <- order( rulefit.results$int.strength , decreasing=TRUE ) # sort partners by decreasing interaction strength
@@ -961,7 +1061,12 @@ get.partner.pair.interactions <- function( rulefit.results , var.rank=1 , var.id
     
   other.idx <- setdiff(valid.other.idx,var.idx) # All other TFs
   
-  int2var = twovarint(var.idx, other.idx, plot=FALSE , import=use.import)
+  if (use.null) {
+    temp.int2var <- twovarint(var.idx, other.idx, plot=FALSE , import=use.import, null.mods=rulefit.results$null.models)
+    int2var <- int2var$int
+  } else {
+    int2var <- twovarint(var.idx, other.idx, plot=FALSE , import=use.import) 
+  }  
 
   if ( ( length(partner.names) > pred.optim) && (! is.null(int.thresh) ) ) {
     topN <- sum(int2var >= int.thresh)
@@ -979,10 +1084,15 @@ get.partner.pair.interactions <- function( rulefit.results , var.rank=1 , var.id
   }
   
   rulefit.results$pair.interactions[ var.idx , other.idx ] <- int2var
+  if (use.null) {
+    rulefit.results$pair.interactions.null.mean[ var.idx , other.idx ] <- temp.int2var$nullave
+    rulefit.results$pair.interactions.null.std[ var.idx , other.idx ] <- temp.int2var$nullstd     
+  }
+  
   return(rulefit.results)
 }
 
-get.all.partner.pair.interactions <- function(rulefit.results, use.import=T, int.thresh=1e-7, pred.optim=50) {
+get.all.partner.pair.interactions <- function(rulefit.results, use.import=T, int.thresh=1e-7, pred.optim=50, use.null=F) {
   # ===================================
   # Computes all pairwise interactions
   # ===================================  
@@ -990,10 +1100,21 @@ get.all.partner.pair.interactions <- function(rulefit.results, use.import=T, int
   # rulefit.results$dataset
   # rulefit.results$vi
   # rulefit.results$int.strength
+  # rulefit.results$int.strength.null.ave (OPTIONAL)
+  # rulefit.results$int.strength.null.std (OPTIONAL)
   # rulefit.results$pair.interactions
+  # rulefit.results$pair.interactions.null.mean (OPTIONAL)
+  # rulefit.results$pair.interactions.null.std (OPTIONAL)
+  # rulefit.results$null.models (OPTIONAL)
+
   # use.import: T/F scales the interaction strengths by variable importance
   # pred.optim: if number of predictors is greater than pred.optim then only compute pairwise interaction scores for predictors with interaction potential > int.thresh
   # int.thresh: interaction threshold to use to consider pairwise interactions
+  # use.null: if set to T, then null models are used to compute null values of interaction strengths
+
+  if (is.character(rulefit.results)) {
+    load(rulefit.results)
+  }
   
   num.partners <- length(rulefit.results$int.strength)
   if ( (num.partners > pred.optim) && (! is.null(int.thresh) ) ) {
@@ -1004,7 +1125,13 @@ get.all.partner.pair.interactions <- function(rulefit.results, use.import=T, int
   cat("Computing pairwise interactions for ",length(valid.idx), " of ", length(rulefit.results$int.strength), " predictors\n")
   for (vidx in valid.idx) {
     cat("\t",vidx,"..\n")
-    rulefit.results <- get.partner.pair.interactions( rulefit.results, var.idx=vidx, plot=F, use.import=T, int.thresh=int.thresh, pred.optim=pred.optim )
+    rulefit.results <- get.partner.pair.interactions( rulefit.results, 
+                                                      var.idx=vidx, 
+                                                      plot=F, 
+                                                      use.import=T, 
+                                                      int.thresh=int.thresh, 
+                                                      pred.optim=pred.optim,
+                                                      use.null=use.null )
   }
   return(rulefit.results)
 }
@@ -1060,79 +1187,79 @@ sample.randneg.rulefit.model <- function(assoc.data , rm.target=F, trim.target=T
     pair.interactions=pair.interactions) )
 }
 
-get.average.randneg.model <- function( assoc.data , iter=50 , plot=FALSE, rm.target=F ) {
-  # DEPRECATED FUNCTION
-  # ===================================
-  # (1) Create multiple random negative sets
-  # (2) Computes average factor importance over all sets
-  # (3) Returns the dataset and model whose factor importance is most correlated with average factor importance    
-  # Returns a list with variables
-  #  $rfmod: Rulefit model object
-  #  $assoc.classf.data: Rulefit classification data frame
-  #  $vi: variable importance DATA FRAME
-  #  $int.strength: interaction strength DATA FRAME
-  #  $pair.interactions: pairwise interactions DATA FRAME MATRIX
-  # ===================================  
-  # assoc.data$assoc.matrix
-  # assoc.data$target.name
-  # iter: number of negative sets to average over
-  
-  # Place holders for each sampled dataset and model
-  sampled.results <- list()
-
-  # Run first iteration
-  curr.model <- get.var.imp( sample.randneg.rulefit.model( assoc.data, rm.target) )
-  final.rulefit.model <- curr.model # Initialize final selected model
-  curr.model$int.strength <- NULL # Remove int.strength
-  curr.model$pair.interactions <- NULL # Remove pair.interactions
-  avi <- curr.model$vi
-  curr.model$vi <- curr.model$vi / max(curr.model$vi + 1e-30) # Divide by max to get relative variable importance
-  sampled.results[[1]] <- curr.model
-  
-  for (i in 2:iter){
-    cat('Iteration ',i,'... \n')
-    curr.model <- get.var.imp( sample.randneg.rulefit.model( assoc.data, rm.target) )
-    curr.model$int.strength <- NULL # Remove int.strength
-    curr.model$pair.interactions <- NULL # Remove pair.interactions
-    avi <- avi + curr.model$vi
-    curr.model$vi <- curr.model$vi / max(curr.model$vi + 1e-30) # Divide by max to get relative variable importance
-    sampled.results[[i]] <- curr.model    
-  }
-  
-  avi <- avi / max(avi + 1e-30) # Divide by max to get relative variable importance
-  
-  # Create plot in necessary
-  if (is.logical(plot)) {
-    if (plot) {
-      title.name <- paste("Average PartnerTF Importance wrt", assoc.data$target.name)
-      make.barplot( as.numeric(avi) , colnames(avi) , title.name=title.name)
-    }    
-  } else {
-    title.name <- paste("Average PartnerTF Importance wrt", avi$target.name)
-    make.barplot( as.numeric(avi) , colnames(avi) , title.name=title.name , to.file=plot )
-  }
-  
-  # Get closest model and dataset  
-  max.corr <- 0
-  model.idx <- 1
-  for (i in 1:iter) {
-    # Check if std.dev of importance vectors are 0
-    if ( ( sd(as.numeric(avi)) == 0 ) | ( sd(as.numeric(sampled.results[[i]]$vi))==0 ) ) {
-      curr.corr <- 0
-    } else {
-      curr.corr <- abs(cor( as.numeric(avi) , as.numeric(sampled.results[[i]]$vi) , method="spearman" ))
-    }
-    if (curr.corr >= max.corr) {
-      max.corr <- curr.corr
-      model.idx <- i
-    }    
-  }
-  final.rulefit.model$rfmod <- sampled.results[[model.idx]]$rfmod
-  final.rulefit.model$dataset <- sampled.results[[model.idx]]$dataset
-  final.rulefit.model$vi <- avi
-  
-  return(final.rulefit.model)
-}
+# get.average.randneg.model <- function( assoc.data , iter=50 , plot=FALSE, rm.target=F ) {
+#   # DEPRECATED FUNCTION
+#   # ===================================
+#   # (1) Create multiple random negative sets
+#   # (2) Computes average factor importance over all sets
+#   # (3) Returns the dataset and model whose factor importance is most correlated with average factor importance    
+#   # Returns a list with variables
+#   #  $rfmod: Rulefit model object
+#   #  $assoc.classf.data: Rulefit classification data frame
+#   #  $vi: variable importance DATA FRAME
+#   #  $int.strength: interaction strength DATA FRAME
+#   #  $pair.interactions: pairwise interactions DATA FRAME MATRIX
+#   # ===================================  
+#   # assoc.data$assoc.matrix
+#   # assoc.data$target.name
+#   # iter: number of negative sets to average over
+#   
+#   # Place holders for each sampled dataset and model
+#   sampled.results <- list()
+# 
+#   # Run first iteration
+#   curr.model <- get.var.imp( sample.randneg.rulefit.model( assoc.data, rm.target) )
+#   final.rulefit.model <- curr.model # Initialize final selected model
+#   curr.model$int.strength <- NULL # Remove int.strength
+#   curr.model$pair.interactions <- NULL # Remove pair.interactions
+#   avi <- curr.model$vi
+#   curr.model$vi <- curr.model$vi / max(curr.model$vi + 1e-30) # Divide by max to get relative variable importance
+#   sampled.results[[1]] <- curr.model
+#   
+#   for (i in 2:iter){
+#     cat('Iteration ',i,'... \n')
+#     curr.model <- get.var.imp( sample.randneg.rulefit.model( assoc.data, rm.target) )
+#     curr.model$int.strength <- NULL # Remove int.strength
+#     curr.model$pair.interactions <- NULL # Remove pair.interactions
+#     avi <- avi + curr.model$vi
+#     curr.model$vi <- curr.model$vi / max(curr.model$vi + 1e-30) # Divide by max to get relative variable importance
+#     sampled.results[[i]] <- curr.model    
+#   }
+#   
+#   avi <- avi / max(avi + 1e-30) # Divide by max to get relative variable importance
+#   
+#   # Create plot in necessary
+#   if (is.logical(plot)) {
+#     if (plot) {
+#       title.name <- paste("Average PartnerTF Importance wrt", assoc.data$target.name)
+#       make.barplot( as.numeric(avi) , colnames(avi) , title.name=title.name)
+#     }    
+#   } else {
+#     title.name <- paste("Average PartnerTF Importance wrt", avi$target.name)
+#     make.barplot( as.numeric(avi) , colnames(avi) , title.name=title.name , to.file=plot )
+#   }
+#   
+#   # Get closest model and dataset  
+#   max.corr <- 0
+#   model.idx <- 1
+#   for (i in 1:iter) {
+#     # Check if std.dev of importance vectors are 0
+#     if ( ( sd(as.numeric(avi)) == 0 ) | ( sd(as.numeric(sampled.results[[i]]$vi))==0 ) ) {
+#       curr.corr <- 0
+#     } else {
+#       curr.corr <- abs(cor( as.numeric(avi) , as.numeric(sampled.results[[i]]$vi) , method="spearman" ))
+#     }
+#     if (curr.corr >= max.corr) {
+#       max.corr <- curr.corr
+#       model.idx <- i
+#     }    
+#   }
+#   final.rulefit.model$rfmod <- sampled.results[[model.idx]]$rfmod
+#   final.rulefit.model$dataset <- sampled.results[[model.idx]]$dataset
+#   final.rulefit.model$vi <- avi
+#   
+#   return(final.rulefit.model)
+# }
 
 learn.posneg.rulefit.model <- function(pos.assoc.data , neg.assoc.data, rm.target=T){
   # ===================================
@@ -1162,18 +1289,28 @@ learn.posneg.rulefit.model <- function(pos.assoc.data , neg.assoc.data, rm.targe
   # Create place holder for interaction strengths
   int.strength <- data.frame(matrix( data=NA , nrow=1 , ncol=n.partners ))
   colnames(int.strength) <- partner.names
+  # int.strength expected null
+  int.strength.null.mean <- int.strength
+  # int.strength std. null
+  int.strength.null.std <- int.strength
   
   # Create place holder for pairwise interactions
   pair.interactions <- data.frame(matrix( data=NA , nrow=n.partners , ncol=n.partners ))
   rownames(pair.interactions) <- partner.names
   colnames(pair.interactions) <- partner.names
+  pair.interactions.null.mean <- pair.interactions
+  pair.interactions.null.std <- pair.interactions
   
   return( list(
     rfmod=rfmod,
     dataset=assoc.classf.data,
     vi=vi,
     int.strength=int.strength,
-    pair.interactions=pair.interactions) )
+    int.strength.null.mean=int.strength.null.mean,
+    int.strength.null.std=int.strength.null.std,
+    pair.interactions=pair.interactions,
+    pair.interactions.null.mean=pair.interactions.null.mean,
+    pair.interactions.null.std=pair.interactions.null.std) )
 }
   
 plot.heatmap <- function(data,
@@ -2245,6 +2382,121 @@ plot.average.pairwise.matrix <- function(rulefit.results, output.dir, output.fil
                 clust.method="ward",
                 break.lowerbound=4.5,                  
                 break.type="linear")  
+}
+
+plot.score.dist.average.pairwise.matrix <- function(rulefit.results, output.dir, output.filename=NA, ext="pdf", filter.thresh=1e-7, feature.type="split") {
+  # ===================================
+  # Plots heatmap of average/aggregated conditional pairwise interactions
+  # Takes as input rulefit.results (list) OR
+  # Rdata file name (string) that contains rulefit.results 
+  # ===================================  
+  # rulefit.results: Rdata file name containing aggregated rulefit.results list OR the aggregated rulefit.results LIST
+  # output.dir: directory where you want to save all figure
+  # output.filename: OPTIONAL file name (no path)
+  # ext: OPTIONAL plot type (png/pdf)
+  # filter.thresh: Threshold used
+  # feature.type: all/null/main/split all: use all features, null: use null features, main: use true features, split: plot main and null on the same plot
+  # Load rulefit.results if input is a data list
+  
+  # Load rulefit.results if input is a character vector
+  if (is.character(rulefit.results)) {
+    load(rulefit.results)    
+  }
+  
+  target.name <- rulefit.results$target.name
+  output.dir <- file.path(output.dir,target.name) 
+  # Create output directory if it doesnt exist
+  if (!file.exists(output.dir)){
+    dir.create(output.dir, recursive=T)
+  }
+
+  plot.title <- sprintf("Pairwise Interactions Score distributions| %s",target.name)
+
+  if (is.na(output.filename)) {
+    output.filename <- file.path( output.dir , sprintf("score.dist.pairwise.int.matrix.%s.%s.%s",feature.type,target.name,ext) )
+  } else {
+    output.filename <- file.path( output.dir , get.file.parts(output.filename)$fullname )
+  }
+  
+  val.data <- rulefit.results$mean.pairwise.int.matrix
+  val.data <- filter.cols( filter.rows(val.data) )
+  
+  # Split into main and null
+  main.row.idx <- grep(".*random.*", rownames(val.data), invert=T)
+  null.row.idx <- grep(".*random.*", rownames(val.data))
+  main.col.idx <- grep(".*random.*", colnames(val.data), invert=T)
+  null.col.idx <- grep(".*random.*", colnames(val.data))
+  
+  # Replace 0s and NAs with smallest non-zero score
+  all.vals <- as.vector( as.matrix(val.data) )
+  all.vals[which(all.vals==0)] <- NA
+  min.score <- min(all.vals,na.rm=T)
+  all.vals[is.na(all.vals)] <- min.score
+  
+  # Replace 0s and NAs with smallest non-zero score
+  main.vals <- as.vector( as.matrix( val.data[main.row.idx,main.col.idx] ) )
+  main.vals[which(main.vals==0)] <- NA
+  main.vals[is.na(main.vals)] <- min.score
+  main.vals <- log10(main.vals)
+  
+  # Get null vals as the set of all scores corresponding to any interaction involving a null feature
+  null.vals <- vector()
+  null.exist <- F
+  if (length(null.row.idx) > 0) {
+    null.exist <- T
+    null.vals <- as.vector( as.matrix( val.data[null.row.idx,main.col.idx] ) )
+  }
+  if (length(null.col.idx) > 0) {
+    null.exist <- T
+    null.vals <- c(null.vals, as.vector( as.matrix( val.data[main.row.idx,null.col.idx] ) ) )
+  }
+  if ( (length(null.row.idx) > 0) & (length(null.col.idx) > 0) ) {
+    null.exist <- T
+    null.vals <- c( null.vals, as.vector( as.matrix( val.data[null.row.idx,null.col.idx] ) ) )
+  }
+  if (null.exist) {
+    # Replace 0s and NAs with smallest non-zero score
+    null.vals[which(null.vals==0)] <- NA
+    null.vals[is.na(null.vals)] <- min.score
+    null.vals <- log10(null.vals)
+  }
+  
+  # Convert to data frames for plotting using ggplot
+  main.vals.data.frame <- data.frame(type="true", log.scores=main.vals - log10(filter.thresh))
+  all.vals.data.frame <- main.vals.data.frame
+  if (null.exist) {
+    null.vals.data.frame <- data.frame(type="null", log.scores=null.vals - log10(filter.thresh))
+    all.vals.data.frame <- rbind(all.vals.data.frame, null.vals.data.frame)    
+  }
+  
+  # Plot figure
+  require(ggplot2)
+  if ( any(feature.type == c("all","split")) ) {
+    p <- ggplot(all.vals.data.frame) 
+  } else if (feature.type == "main") {
+    p <- ggplot(main.vals.data.frame)
+  } else {
+    p <- ggplot(null.vals.data.frame)
+  }
+  
+  if (feature.type == "all") {
+    p <- p + geom_density(aes(x=log.scores)) + opts(title=target.name)
+  } else {
+    p <- p + geom_density(aes(x=log.scores,color=type,fill=type),alpha=I(0.3), size=I(0.2)) + opts(title=target.name)
+  }
+  
+  # Obtain thresholds based on quantiles of interaction scores of null features
+  thresholds <- NA
+  if (null.exist) {
+    thresholds <- quantile( null.vals, 1-c(0.05,0.01,0.005,0.001,0.0005,0.0001) ) - log10(filter.thresh)
+  }
+  
+  ggsave(filename=output.filename, plot=p, dpi=300, width=5,height=5)
+  
+  invisible(list(log.main.vals=main.vals,
+                 log.null.vals=null.vals,
+                 log.all.vals.df=all.vals.data.frame,
+                 thresholds=thresholds))
 }
 
 write.table.average.pairwise.matrix <- function(rulefit.results, output.dir, filter.thresh=1e-7) {
