@@ -874,7 +874,7 @@ get.var.imp <- function(rulefit.results, class=1){
   return(rulefit.results)
 }
 
-get.null.models <- function(rulefit.results, ntimes=5) {
+get.null.models <- function(rulefit.results, ntimes=10) {
   # Computes null models for a rulefit model
   # rulefit.results$rfmod
   # rulefit.results$dataset
