@@ -802,7 +802,7 @@ make.barplot <- function( vals , labels=NULL , sort.flag=TRUE , top.N=NULL , y.l
   if (length(vals) == 0) {return()}
   
   if (sort.flag) {                      
-    p1 <- ggplot(vals) + geom_bar( aes( x=reorder(names,vals) , y=vals ), stat="identity", fill=I("blue") ) 
+    p1 <- ggplot(vals) + geom_bar( aes( x=reorder(names,vals) , y=vals ), stat="identity", fill=I("grey30") ) 
   } else {
     p1 <- ggplot(vals) + geom_bar( aes( x=names , y=vals ), stat="identity", fill=I("blue") )
   }
@@ -816,9 +816,9 @@ make.barplot <- function( vals , labels=NULL , sort.flag=TRUE , top.N=NULL , y.l
   if (! is.null(to.file) ) {
     file.ext <- get.file.parts(to.file)$ext
     if (tolower(file.ext) == '.png') {      
-      ggsave(file=to.file, plot=p1, width=6, height=10, dpi=600)      
+      ggsave(file=to.file, plot=p1, width=4, height=10, dpi=600)      
     } else {
-      ggsave(file=to.file, plot=p1, width=6, height=10)      
+      ggsave(file=to.file, plot=p1, width=4, height=10)      
     }
   } else {
     p1
@@ -1703,7 +1703,7 @@ plot.heatmap <- function(data,
                  col.cluster=col.cluster.results))
 }
 
-plot.importance <- function(rulefit.results, output.dir=NULL, output.filename=NULL, ext="png", filt.thresh=5){
+plot.importance <- function(rulefit.results, output.dir=NULL, output.filename=NULL, ext="pdf", filt.thresh=5){
   # ===================================
   # Plots variable importance
   # Takes as input rulefit.results (list) OR
@@ -1737,6 +1737,8 @@ plot.importance <- function(rulefit.results, output.dir=NULL, output.filename=NU
   if (! is.null(filt.thresh) ) {
     rulefit.results$vi <- rulefit.results$vi[, (rulefit.results$vi >= filt.thresh) ]
   }
+  rulefit.results$vi <- filter.cols(rulefit.results$vi)
+  colnames(rulefit.results$vi) <- standardize.name(colnames(rulefit.results$vi))
   
   make.barplot( as.numeric(rulefit.results$vi), labels=colnames(rulefit.results$vi), title.name=plot.title , to.file=output.filename )
 }
