@@ -16,11 +16,11 @@ if [[ "$#" -lt 4 ]]
     exit 1 
 fi
 
-RM_TARGET='F'
-TRIM_TARGET='F'
-APPEND_NULL='T'
-NULL_MODE='2'
-NULL_REPLACE='T'
+RM_TARGET='F' # Removes target TF
+TRIM_TARGET='F' # Removes rows where target TF has value < 0
+APPEND_NULL='F' # Will append randomized features to the feature matrix
+NULL_MODE='2' # How to randomize feaures (2: columns, 1: rows, 0: rows and cols)
+NULL_REPLACE='F' # Whether to replace the original features entirely with randomized features. APPEND_NULL needs to be 'T' in order for this condition to fire
 
 SCRIPT_NAME=$1
 if [[ ! -e ${SCRIPT_NAME} ]]
