@@ -886,7 +886,8 @@ get.null.models <- function(rulefit.results, ntimes=10) {
     load(rulefit.results)
   }
   
-  rulefit.results <- restore.rf.model(rulefit.results)
+  #rulefit.results <- restore.rf.model(rulefit.results)
+  cat("Computing null models ...\n");
   
   if ( any( names(rulefit.results) == "null.models" ) ) {
     rulefit.results$null.models <- intnull(ntimes, null.mods=rulefit.results$null.models, quiet=T)
@@ -930,7 +931,7 @@ get.int.strength <- function( rulefit.results , plot=FALSE, use.null=F) {
     
     # Check if null models are computed. If not compute them
     if ( any( names(rulefit.results) == "null.models" ) ) {
-      if (is.na(rulefit.results$null.models)) {
+      if (all(is.na(rulefit.results$null.models))) {
         rulefit.results <- get.null.models(rulefit.results)
       }
     } else {
@@ -1019,7 +1020,7 @@ get.partner.pair.interactions <- function( rulefit.results,
   if (use.null) {    
     # Compute null models if required
     if ( any( names(rulefit.results) == "null.models" ) ) {
-      if (is.na(rulefit.results$null.models)) {
+      if (all(is.na(rulefit.results$null.models))) {
         rulefit.results <- get.null.models(rulefit.results)
       }
     } else {

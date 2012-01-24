@@ -2,6 +2,7 @@ rm(list=ls())
 args <- commandArgs(trailingOnly=TRUE); # Read Arguments from command line
 nargs = length(args); # number of arguments
 rm.target=T  # Set to true if you want to remove target variable from predictors
+use.null=T # Set to T if you want to compute null models for feature interactions
 
 # Print usage
 print.usage <- function(){
@@ -84,12 +85,12 @@ save(list="rulefit.results",file=output.file)
 
 # # Compute interaction strength
 cat("Computing global interaction strength ...\n")
-rulefit.results <- get.int.strength( rulefit.results, use.null=T )
+rulefit.results <- get.int.strength( rulefit.results, use.null=use.null )
 save(list="rulefit.results",file=output.file)
 
 # Compute pairwise interactions
 cat("Computing all pairwise interactions\n")
-rulefit.results <- get.all.partner.pair.interactions(rulefit.results, use.import=T, use.null=T)
+rulefit.results <- get.all.partner.pair.interactions(rulefit.results, use.import=T, use.null=use.null)
 save(list="rulefit.results",file=output.file)
 
 # Compute cross-validation error
