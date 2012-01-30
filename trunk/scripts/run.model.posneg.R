@@ -2,7 +2,7 @@ rm(list=ls())
 args <- commandArgs(trailingOnly=TRUE); # Read Arguments from command line
 nargs = length(args); # number of arguments
 rm.target=T  # Set to true if you want to remove target variable from predictors
-use.null=T # Set to T if you want to compute null models for feature interactions
+use.null=F # Set to T if you want to compute null models for feature interactions
 
 # Print usage
 print.usage <- function(){

@@ -94,7 +94,7 @@ for (each.file in all.Rdata.files) {
       all.vi.matrix <- curr.vi    
     } else {
       curr.vi <- as.data.frame(curr.vi[rownames(all.vi.matrix),])
-      rownames(curr.vi) <- rulefit.results$mean.vi$tf.name
+      rownames(curr.vi) <- rownames(all.vi.matrix)
       colnames(curr.vi) <- curr.target      
       all.vi.matrix <- cbind(all.vi.matrix, curr.vi) # column bind vi values
     }
@@ -121,7 +121,7 @@ for (each.file in all.Rdata.files) {
       all.int.strength.matrix <- curr.int
     } else {
       curr.int <- as.data.frame(curr.int[rownames(all.int.strength.matrix),])
-      rownames(curr.int) <- rulefit.results$mean.int.strength$tf.name
+      rownames(curr.int) <- rownames(all.int.strength.matrix)
       colnames(curr.int) <- curr.target
       all.int.strength.matrix <- cbind(all.int.strength.matrix, curr.int)
     }

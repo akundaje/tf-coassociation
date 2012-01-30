@@ -181,6 +181,10 @@ filter.cols <- function(data,rm.treatments=F) {
                 "Helas3CmycIFNg30",
                 "Helas3Cmyc",
                 "expr.val")
+  if (rm.treatments) {
+    rem.cols <- c(rem.cols,
+                  colnames(data)[grep("IFNa|IFNg",colnames(data),ignore.case=T)])
+  }
   rm.idx <- match(rem.cols, colnames(data))
   rm.idx <- rm.idx[! is.na(rm.idx)]
   if (length(rm.idx) > 0) {
@@ -190,7 +194,7 @@ filter.cols <- function(data,rm.treatments=F) {
 }
 
 
-filter.rows <- function(data) {
+filter.rows <- function(data,rm.treatments=F) {
   # ===================================
   # Remove specific rows and columns from a data frame
   # ===================================  
@@ -211,6 +215,10 @@ filter.rows <- function(data) {
                 "Helas3CmycIFNg30",
                 "Helas3Cmyc",                
                 "expr.val")
+  if (rm.treatments) {
+    rem.cols <- c(rem.cols,
+                  colnames(data)[grep("IFNa|IFNg",colnames(data),ignore.case=T)])
+  }
   rm.idx <- match(rem.rows, rownames(data))
   rm.idx <- rm.idx[! is.na(rm.idx)]
   if (length(rm.idx) > 0) {
@@ -480,7 +488,7 @@ batch.update.Rdata.with.expr.zscr <- function(assoc.dir, expr.zscr.file) {
  }
 }
 
-randomize.assoc.matrix <- function(assoc.data, num.rand=1, rand.dim=2){
+randomize.assoc.matrix <- function(assoc.data, num.rand=1, rand.dim=2, change.row.names=T){
   # ===================================
   # Create randomized association matrix
   # Each column is randomized individually
@@ -500,14 +508,19 @@ randomize.assoc.matrix <- function(assoc.data, num.rand=1, rand.dim=2){
     
     random.assoc.matrix <- as.data.frame( apply( assoc.data$assoc.matrix , 2 , sample ) ) # apply the 'sample' function to each column of assoc.matrix
     random.assoc.matrix <- as.data.frame( apply( random.assoc.matrix , 1 , sample ) ) # apply the 'sample' function to each row of assoc.matrix
-    rownames(random.assoc.matrix) <- paste( rownames(random.assoc.matrix) , 'random' , sep="_" ) # Add '_random' suffix to each row name
+    if (change.row.names) {
+      rownames(random.assoc.matrix) <- paste( rownames(random.assoc.matrix) , 'random' , sep="_" ) # Add '_random' suffix to each row name
+    } else {
+      rownames(random.assoc.matrix) <- rownames(assoc.data$assoc.matrix)
+    }
+    
     colnames(random.assoc.matrix) <- colnames(assoc.data$assoc.matrix)
     
     if (num.rand > 1) {
       for (i in c(2:num.rand)) {
         temp.matrix <- as.data.frame( apply( assoc.data$assoc.matrix , 2 , sample ) )
         temp.matrix <- as.data.frame( apply( temp.matrix , 1 , sample ) )
-        rownames(temp.matrix) <- paste( rownames(temp.matrix) , 'random' , sep="_" ) # Add '_random' suffix to each row name
+        rownames(temp.matrix) <- paste( rownames(temp.matrix) , 'random' , sep="_" ) # Add '_random' suffix to each row name        
         colnames(temp.matrix) <- colnames(assoc.data$assoc.matrix)
         random.assoc.matrix <- rbind( random.assoc.matrix, temp.matrix  )
       }
@@ -522,7 +535,11 @@ randomize.assoc.matrix <- function(assoc.data, num.rand=1, rand.dim=2){
       random.assoc.matrix <- as.data.frame(random.assoc.matrix)
       rownames(random.assoc.matrix) <- rownames(assoc.data$assoc.matrix)
     }
-    rownames(random.assoc.matrix) <- paste( rownames(random.assoc.matrix) , 'random' , sep="_" ) # Add '_random' suffix to each row name
+    if (change.row.names) {
+      rownames(random.assoc.matrix) <- paste( rownames(random.assoc.matrix) , 'random' , sep="_" ) # Add '_random' suffix to each row name      
+    } else {
+      rownames(random.assoc.matrix) <- rownames(assoc.data$assoc.matrix)
+    }    
     colnames(random.assoc.matrix) <- colnames(assoc.data$assoc.matrix)
     if (num.rand > 1) {
       for (i in c(2:num.rand)) {
@@ -719,7 +736,7 @@ run.rulefit <- function(assoc.classf.data, mode="class", corr.penalty=3, model.t
   
   rfmod <- rulefit(x=assoc.classf.data$x.vals ,
                    model.type=model.type,
-                   #sparse=2,
+                   #sparse=1,
                    inter.supp=corr.penalty,
                    xmiss=9e30, 
                    y=assoc.classf.data$y.vals , 
@@ -731,6 +748,12 @@ run.rulefit <- function(assoc.classf.data, mode="class", corr.penalty=3, model.t
                    quiet=T
                    )  
   return(rfmod)
+}
+
+compute.rsquare <- function(y.true, y.pred) {
+  # Computes coefficient of determination R-square
+  r.square <- 1 - sum( (y.true - y.pred)^2 ) / sum( (y.true - mean(y.true))^2 )
+  return(r.square)
 }
 
 run.cv.rulefit <- function(rulefit.results, nfold=10) {
@@ -748,7 +771,7 @@ run.cv.rulefit <- function(rulefit.results, nfold=10) {
   # Load rulefit.results if input is a data list
   rulefit.results <- restore.rf.model( rulefit.results )  
   rulefit.results$cv = rfxval (nfold=nfold, quiet=T)
-  rulefit.results$cv$lo <- NULL
+  #rulefit.results$cv$lo <- NULL
   if ( any(grepl( pattern="rmse", x=names(rulefit.results$cv), fixed=T)) ) {
     rulefit.results$cv$rsquare <- 1 - ( rulefit.results$cv$rmse^2 / 
       mean((rulefit.results$dataset$y.vals - mean(rulefit.results$dataset$y.vals,na.rm=T))^2 ,na.rm=T) )
@@ -1279,7 +1302,7 @@ learn.posneg.rulefit.model <- function(pos.assoc.data , neg.assoc.data, rm.targe
     
   assoc.classf.data <- make.assoc.classf.posneg.dataset(pos.assoc.data, neg.assoc.data, rm.target)
   ntrue <- (assoc.classf.data$y.vals == 1)
-  rfmod <- run.rulefit(assoc.classf.data,corr.penalty=1)
+  rfmod <- run.rulefit(assoc.classf.data,corr.penalty=1,tree.size=4)
   
   # Create place holder for variable importance
   partner.names <- colnames(assoc.classf.data$x.vals)
@@ -1822,7 +1845,7 @@ plot.pairwise <- function(rulefit.results, output.dir=NULL, ext="png", filt.thre
   }
 }
 
-plot.pairwise.matrix <- function(rulefit.results, output.dir, output.filename=NA, ext="pdf", filter.thresh=1e-7){
+plot.pairwise.matrix <- function(rulefit.results, output.dir, output.filename=NA, ext="pdf", filter.thresh=1e-7, use.null=F){
   # ===================================
   # Plots interaction strength
   # Takes as input rulefit.results (list) OR
@@ -1832,6 +1855,8 @@ plot.pairwise.matrix <- function(rulefit.results, output.dir, output.filename=NA
   # output.dir: directory where you want to save all figure
   # output.filename: OPTIONAL file name (no path)
   # ext: OPTIONAL plot type (png/pdf)
+  # filter.thresh: Threshold used to filter and normalize scores
+  # use.null: if set to T, then if null scores are available they will be subtracted from the true scores
 
   # Load rulefit.results if input is a character vector
   if (is.character(rulefit.results)) {
@@ -1854,6 +1879,13 @@ plot.pairwise.matrix <- function(rulefit.results, output.dir, output.filename=NA
   }
   
   val.data <- rulefit.results$pair.interactions
+  if (use.null) {
+    if (any(names(rulefit.results)=="pair.interactions.null.mean")) {
+      rulefit.results$pair.interactions.null.mean[is.na(rulefit.results$pair.interactions.null.mean)] <- 0
+      val.data <- val.data - rulefit.results$pair.interactions.null.mean
+      val.data[val.data < 0] <- 0
+    }
+  }
   val.data <- filter.cols( filter.rows(val.data) )
   rownames(val.data) <- standardize.name(rownames(val.data))
   colnames(val.data) <- standardize.name(colnames(val.data))
@@ -2616,9 +2648,16 @@ compute.proximal.distal.diff.importance <- function(input.dir,
                                                     peak.distance.file, 
                                                     output.filename=NULL,
                                                     proximal.cutoff=5000,                                                    
-                                                    distal.cutoff=10000) {
+                                                    distal.cutoff=10000,
+                                                    rev.peak.ids=T) {
   # Computes differential relative importance for all factors comparing proximal vs. distal sites of the target factor
-
+  # input.dir: directory containing multiple rulefit results from randomized negative sets
+  # peak.distance.file: Contains peak distance to nearest TSS information
+  # output.filename: output figure file name
+  # proximal.cutoff: distance threshold to use as "proximal" class
+  # distal.cutoff: distance threshold to use for "distal" class
+  # rev.peak.ids: Reverse peak ids in the distance file (This is to be used when peak labeled rank1 in distance file refers to weakest peak, whereas peak labeled rank1 in association data is the strongest peak)
+  
   # Check that input directory exists
   if (! file.exists(input.dir)) {
     stop("Input Directory ", input.dir," does not exist\n")
@@ -2642,15 +2681,27 @@ compute.proximal.distal.diff.importance <- function(input.dir,
                                sep="\t",
                                #col.names=c("peak.chr","peak.start","peak.stop","peak.id","tss.chr","tss.start","tss.stop","tss.id","dist"),
                                stringsAsFactors=F)
+    
   proximal.peak.ids <- distance.table$peak.id[distance.table$dist <= proximal.cutoff]
-  distal.peak.ids <- distance.table$peak.id[distance.table$dist > distal.cutoff]
-  
+  distal.peak.ids <- distance.table$peak.id[distance.table$dist > distal.cutoff]  
+    
   # Get list of Rdata files in directory
   all.Rdata.files <- list.files(path=input.dir, pattern=".*Rdata$", full.names=T) # Get names of Rdata files
   n.Files <- length(all.Rdata.files)
   if (n.Files == 0) {
     stop("No Rdata files found in input directory", input.dir, "\n")
   }
+
+  # Reverse peak ids if necessary  
+  if (rev.peak.ids) {
+    load(all.Rdata.files[1])
+    assoc.data.peak.ids <- rownames(rulefit.results$dataset$x.vals)[rulefit.results$dataset$x.vals == 1]
+    assoc.data.peak.ranks <- as.numeric( gsub( '(^.*Pk_)|(_[^_]+$)' , '' , assoc.data.peak.ids ) ) # Convert PeakIds to numbers
+    assoc.data.peak.ids <- assoc.data.peak.ids[order(assoc.data.peak.ranks)] # Order the assoc.data peak ids
+    dtable.peak.ids <- rev( assoc.data.peak.ids ) # dtable.ids is reverse of assoc.ids (each index matches up)
+    proximal.peak.ids <- assoc.data.peak.ids[dtable.peak.ids %in% proximal.peak.ids] # Find dtable indices that match proximal.peak.ids and then translate to assoc.ids
+    distal.peak.ids <- assoc.data.peak.ids[dtable.peak.ids %in% distal.peak.ids] # Find dtable indices that match distal.peak.ids and then translate to assoc.ids
+  }  
   
   # Load each Rdata file, compute differential importance and store them
   proximal.vi <- data.frame()
@@ -2886,17 +2937,22 @@ batch.read.gc.assoc.file.to.Rdata <- function( assoc.dir , output.dir=NULL) {
   }
 }
 
-consolidate.expression.data <- function( expr.file, pseudo.count=1e-3 ) {
-# Reads in RNA/CAGE tables, takes log2 transform and then averages replicates
+consolidate.expression.data <- function( expr.file, norm.type="asinh", pseudocount=1e-5, process.reps="average" ) {
+  # Reads in RNA/CAGE tables, takes log2 transform and then averages replicates
+  # expr.file: expression data, different columns for different expression data types
+  # norm.type: normalization mode
+  #       "none" : no transformation
+  #       "log": add pseudocount and then take log2
+  #       "logmin" : add minimum value as pseudocount and then use log
+  #       "sqrt": square root transform
+  #       "asinh" : inverse sinh which can be interpretted similar to log but works for 0 and negative values as well
+  #       "normscore": convert to normal scores normx = qnorm((rank(x) - 0.375)/(sum(!is.na(x)) + .25))
+  # pseudocount: pseudocount to be added to expr if log is used
+  # process.reps: how to process replicates
+  #               "average" : will average replicates
+  #               "indiv": randomly select one of the reps
   
-  expr <- read.table( expr.file , header=T , row.names=1 , sep="\t" )
-  expr[expr==0] <- NA
-  min.val <- min(expr,na.rm=T)
-  expr <- expr + min.val
-  expr[is.na(expr)] <- min.val
-  expr <- log2(expr)
-#   expr <- log2(expr+1)
-  
+  expr <- read.table( expr.file , header=T , row.names=1 , sep="\t" )  
   expr.colnames <- colnames(expr)
   expr.colnames <- gsub( "rep[1-9]+" , "rep0", expr.colnames )
   unique.expr.colnames <- unique(expr.colnames)
@@ -2905,14 +2961,44 @@ consolidate.expression.data <- function( expr.file, pseudo.count=1e-3 ) {
   ncols.f.expr <- length(unique.expr.colnames)
   final.expr <- expr[, c(1:ncols.f.expr)]
   colnames(final.expr) <- unique.expr.colnames
+  
+  # Aggregate reps if required
   for (i in c(1 : ncols.f.expr)) {
-    curr.idx <- (idx==i)
-    if (sum(curr.idx) > 1) {
+    curr.idx <- which(idx==i)
+    if (process.reps=="indiv") {
+      curr.idx <- curr.idx[1]
+    }
+    if (length(curr.idx) > 1) {
       final.expr[ , i ] <- apply( expr[ , curr.idx], 1, mean )  
     } else {
       final.expr[ , i ] <- expr[ , curr.idx]
     }          
   }
+  
+  # Normalize expression values
+  if (norm.type=="logmin") {
+    final.expr[final.expr==0] <- NA
+    min.val <- min(final.expr,na.rm=T)
+    final.expr <- final.expr + min.val
+    final.expr[is.na(final.expr)] <- min.val
+    final.expr <- log2(final.expr)    
+  } else if (norm.type=="log") {
+    final.expr <- log2(final.expr + pseudocount)
+  } else if (norm.type=="sqrt") {
+    final.expr <- sqrt(final.expr)
+  } else if (norm.type=="asinh") {
+    final.expr <- asinh(final.expr)
+  } else if (norm.type=="normscore") {
+    r.names <- rownames(final.expr)
+    c.names <- colnames(final.expr)
+    final.expr <- as.data.frame(
+      apply(final.expr,
+            2,
+            function (x) qnorm((rank(x,ties.method="random") - 0.375)/(sum(!is.na(x)) + .25)) ) )
+    rownames(final.expr) <- r.names
+    colnames(final.expr) <- c.names
+  }
+  
   return(final.expr)  
 }
 
@@ -2939,10 +3025,11 @@ consolidate.expression.data <- function( expr.file, pseudo.count=1e-3 ) {
 #   return(list(x.vals=x.vals,y.vals=y.vals,target.name=assoc.data$target.name))
 # }
 
-make.gene.centric.tf.to.expr.dataset <- function(assoc.data,
-                                    expr,
-                                    filter.expr=c("Cy","plus","Cage"),
-                                    rm.zero.expr=NA){
+make.gene.centric.tf.to.expr.dataset <- function(assoc.data,    # Gene centric association dataset
+                                                 expr,    # expression dataset
+                                                 filter.expr=c("Cy","plus","Cage"),   # terms to filter columns of expr by (grep)
+                                                 rm.zero.expr=NA  # will remove genes whose expression values are < rm.zero.expr
+                                                 ){
   # ===================================
   # Create Gene Centric expression dataset
   # ===================================  
@@ -2955,8 +3042,8 @@ make.gene.centric.tf.to.expr.dataset <- function(assoc.data,
   }
 
   # Remove genes for which there is no TF data
-  x.vals <- assoc.data$assoc.matrix
-  x.vals <- x.vals[ (apply(x.vals,1,function(x) sum(x,na.rm=T))>0) , ]
+  x.vals <- filter.cols(assoc.data$assoc.matrix,rm.treatments=T)
+  x.vals <- x.vals[ (apply(x.vals,1,function(x) sum(as.numeric(x>0),na.rm=T))>-1) , ]
   
   # Load expression data
   if (is.character(expr)) {
@@ -2969,10 +3056,16 @@ make.gene.centric.tf.to.expr.dataset <- function(assoc.data,
   for (i in filter.expr) {
     expr.types <- expr.types[grep(i,expr.types,ignore.case=T)]
   }
+  if (length(expr.types) > 1) {
+    cat("Multiple expr types match .. Choosing first match\n")
+    expr.types <- expr.types[1]
+  }
+  cat(expr.types,"\n")
   y.vals <- expr[,expr.types]
   names(y.vals) <- rownames(expr)
+  y.vals <- y.vals - min(y.vals) # Make the y values start at 0
   
-  # Remove zero valued expression data if required
+  # Remove low expression data if required
   if (!is.na(rm.zero.expr)) {
     y.vals <- y.vals[y.vals>rm.zero.expr]
   }
@@ -2983,6 +3076,111 @@ make.gene.centric.tf.to.expr.dataset <- function(assoc.data,
   y.vals <- y.vals[ match(common.gene.names,names(y.vals)) ]
       
   return(list(x.vals=x.vals,y.vals=y.vals,target.name=assoc.data$target.name))
+}
+
+learn.tf.to.expr.rulefit.model <- function(assoc.data,    # Gene centric association dataset
+                                           expr,    # expression dataset
+                                           filter.expr=c("Cy","plus","Cage"),   # terms to filter columns of expr by (grep)
+                                           rm.zero.expr=NA,  # will remove genes whose expression values are < rm.zero.expr
+                                           two.stage.model=T,
+                                           randomize=NA # Set to 0 (randomize rows and cols), 1 (randomize rows), 2 (randomize columns)
+                                           ){
+  # ===================================
+  # Sample a rulefit model
+  # Returns
+  #   $rfmod: rulefit model
+  #   $dataset: sampled dataset
+  #   $vi: variable importance (place holder data.frame of n.cols #partners)
+  #   $int.strength: interaction strengths (placeholder data.frame of length #partners)
+  #   $pair.interactions: pairwise interactions (placeholder data.frame of size #partners X #partners)
+  # ===================================  
+  # assoc.data$assoc.matrix
+  # assoc.data$target.name
+  tree.size=10
+  test.reps=3
+  
+  if (is.character(assoc.data)) {
+    load(assoc.data)
+  }
+  
+  if (!is.na(randomize)) {
+    assoc.data$assoc.matrix <- randomize.assoc.matrix(assoc.data,rand.dim=randomize,change.row.names=F)
+  }
+  
+  assoc.classf.data <- make.gene.centric.tf.to.expr.dataset(assoc.data, expr, filter.expr, rm.zero.expr)
+  
+  if (two.stage.model) {
+    class.dataset <- assoc.classf.data
+    min.val <- min(class.dataset$y.vals)
+    class.dataset$y.vals[class.dataset$y.vals > min.val] <- 1 # Set non-zero values to 1
+    class.dataset$y.vals[class.dataset$y.vals <= min.val] <- -1 # Set non-zero values to 1
+    rfmod.class <- run.rulefit(class.dataset, mode="class",tree.size=tree.size,test.reps=test.reps) # Learn classification model
+    
+    regress.dataset <- assoc.classf.data
+    keep.idx <- (regress.dataset$y.vals > min.val) # Only keep non-zero values
+    regress.dataset$x.vals <- regress.dataset$x.vals[keep.idx,]
+    regress.dataset$y.vals <- regress.dataset$y.vals[keep.idx]
+    rfmod.regress <- run.rulefit(regress.dataset, mode="regress",tree.size=tree.size,test.reps=test.reps)
+  } else {
+    rfmod <- run.rulefit(assoc.classf.data, mode="regress",tree.size=tree.size,test.reps=test.reps)
+  } 
+  
+  # Create place holder for variable importance
+  partner.names <- colnames(assoc.classf.data$x.vals)
+  n.partners <- length(partner.names)
+  vi <- as.data.frame( matrix( data=NA, nrow=1, ncol=n.partners) )
+  colnames(vi) <- partner.names
+  
+  # Create place holder for interaction strengths
+  int.strength <- data.frame(matrix( data=NA , nrow=1 , ncol=n.partners ))
+  colnames(int.strength) <- partner.names
+  
+  # Create place holder for pairwise interactions
+  pair.interactions <- data.frame(matrix( data=NA , nrow=n.partners , ncol=n.partners ))
+  rownames(pair.interactions) <- partner.names
+  colnames(pair.interactions) <- partner.names
+  
+  if (two.stage.model) {
+    
+    # Create classification results
+    class.results <- list(rfmod=rfmod.class,
+                          dataset=class.dataset,
+                          vi=vi,
+                          int.strength=int.strength,
+                          pair.interactions=pair.interactions)
+    class.results <- run.cv.rulefit(class.results)
+    
+    # Create regression results
+    regress.results <- list(rfmod=rfmod.regress,
+                            dataset=regress.dataset,
+                            vi=vi,
+                            int.strength=int.strength,
+                            pair.interactions=pair.interactions)
+    regress.results <- run.cv.rulefit(regress.results)
+    
+    # Combine predictions
+    regress.results <- restore.rf.model(regress.results)
+    y.regress <- rfpred(class.results$dataset$x.vals)    
+    y.pred <- as.numeric(class.results$cv$lo > 0) * y.regress
+    
+    combined.results <- list(dataset=assoc.classf.data,
+                             y.pred=y.pred)
+    
+    rulefit.results <- list(class.results=class.results,
+                            regress.results=regress.results,
+                            combined.results=combined.results)
+    
+  } else {
+    
+    rulefit.results <- list(rfmod=rfmod,
+                            dataset=assoc.classf.data,
+                            vi=vi,
+                            int.strength=int.strength,
+                            pair.interactions=pair.interactions)
+    rulefit.results <- run.cv.rulefit(rulefit.results)
+  }
+  
+  return( rulefit.results )
 }
 
 # =================================================================================================================================
