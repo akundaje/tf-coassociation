@@ -110,19 +110,29 @@ rfhome <- initialize.rulefit(rf.package.path='/media/fusion10/work/encode/learni
 #   }
 # }
 
-for (cell in c("randneg_iter","null_append_randneg_iter")) {
-# for (cell in c("K562")) {  
-#   input.dir <- sprintf("/media/fusion10/work/encode/learning/combinatorics/results/TFCentric/randneg_iter/%s/average/null_append_OA_max_tree6_average",cell)
-#   output.dir <- sprintf("/media/fusion10/work/encode/learning/combinatorics/figures/TFCentric/randneg_iter/%s/null_append_OA_max_tree6_average",cell)
-  input.dir <- sprintf("/media/fusion10/work/encode/learning/combinatorics/results/GeneCentric/%s/average/",cell)
-  output.dir <- sprintf("/media/fusion10/work/encode/learning/combinatorics/figures/GeneCentric/%s",cell)  
+# for (cell in c("randneg_iter","null_append_randneg_iter")) {
+# # for (cell in c("K562")) {  
+# #   input.dir <- sprintf("/media/fusion10/work/encode/learning/combinatorics/results/TFCentric/randneg_iter/%s/average/null_append_OA_max_tree6_average",cell)
+# #   output.dir <- sprintf("/media/fusion10/work/encode/learning/combinatorics/figures/TFCentric/randneg_iter/%s/null_append_OA_max_tree6_average",cell)
+#   input.dir <- sprintf("/media/fusion10/work/encode/learning/combinatorics/results/GeneCentric/%s/average/",cell)
+#   output.dir <- sprintf("/media/fusion10/work/encode/learning/combinatorics/figures/GeneCentric/%s",cell)  
+#   dir.create(path=output.dir,recursive=T)
+#   for (i in list.files(path=input.dir,pattern=".*Rdata$",full.names=T)) {
+#     tryCatch( plot.average.vi(rulefit.results=i,output.dir=output.dir,thresh=5), error = function(e) cat("ERROR\n"))
+#     tryCatch( plot.average.int.strength(rulefit.results=i,output.dir=output.dir,thresh=1e-3), error = function(e) cat("ERROR\n"))
+#     #tryCatch( plot.average.pairwise(rulefit.results=i,output.dir=output.dir), error = function(e) cat("ERROR\n"))
+#     tryCatch( plot.average.pairwise.matrix(rulefit.results=i,output.dir=output.dir), error = function(e) cat("ERROR\n"))
+#     tryCatch( write.table.average.pairwise.matrix(rulefit.results=i,output.dir=output.dir), error = function(e) cat("ERROR\n"))
+#   }
+# }
+
+for (cell in c("GM12878","K562","Hela-S3","Hepg2","H1hesc")) {
+  input.dir <- sprintf("/media/fusion10/work/encode/learning/combinatorics/results/TFCentric/posneg_rand/%s",cell)
+  output.dir <- sprintf("/media/fusion10/work/encode/learning/combinatorics/figures/TFCentric/posneg_rand/%s",cell)  
   dir.create(path=output.dir,recursive=T)
   for (i in list.files(path=input.dir,pattern=".*Rdata$",full.names=T)) {
-    tryCatch( plot.average.vi(rulefit.results=i,output.dir=output.dir,thresh=5), error = function(e) cat("ERROR\n"))
-    tryCatch( plot.average.int.strength(rulefit.results=i,output.dir=output.dir,thresh=1e-3), error = function(e) cat("ERROR\n"))
-    #tryCatch( plot.average.pairwise(rulefit.results=i,output.dir=output.dir), error = function(e) cat("ERROR\n"))
-    tryCatch( plot.average.pairwise.matrix(rulefit.results=i,output.dir=output.dir), error = function(e) cat("ERROR\n"))
-    tryCatch( write.table.average.pairwise.matrix(rulefit.results=i,output.dir=output.dir), error = function(e) cat("ERROR\n"))
+    tryCatch( plot.importance(rulefit.results=i,output.dir=output.dir,filt.thresh=1e-5), error = function(e) cat("ERROR\n"))
+    tryCatch( plot.pairwise.matrix(rulefit.results=i,output.dir=output.dir,use.null=T), error = function(e) cat("ERROR\n"))
   }
 }
 # input.dir <- "/media/fusion10/work/encode/learning/combinatorics/results/PWMs/all"
