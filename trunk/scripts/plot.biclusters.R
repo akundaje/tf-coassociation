@@ -49,7 +49,7 @@ load(assoc.data.file)
 #colnames(assoc.data$assoc.matrix) <- gsub("GM12878|K562|HelaS3|Hepg2|H1hesc", "", toupper(colnames(assoc.data$assoc.matrix)), ignore.case=T)
 #assoc.data$assoc.matrix <- filter.cols(assoc.data$assoc.matrix)
 assoc.data$assoc.matrix <- filter.cols(assoc.data$assoc.matrix)
-colnames(assoc.data$assoc.matrix) <- standardize.name(names=colnames(assoc.data$assoc.matrix))
+colnames(assoc.data$assoc.matrix) <- standardize.name(colnames(assoc.data$assoc.matrix))
 #assoc.data$assoc.matrix <- scale(assoc.data$assoc.matrix)
 clust.results <- plot.heatmap(t(assoc.data$assoc.matrix),
              to.file=output.file, 
