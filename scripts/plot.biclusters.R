@@ -1,14 +1,13 @@
 rm(list=ls())
 args <- commandArgs(trailingOnly=TRUE); # Read Arguments from command line
 nargs = length(args); # number of arguments
-rm.target=T  # Set to true if you want to remove target variable from predictors
 
 # Print usage
 print.usage <- function(){
   cat("Rscript plot.biclusters.R [assocData] [outputFile]\n")
   cat("Plots co-binding map for a particular target TF domain\n")
   cat("   [assocData]: .Rdata file containing association matrix\n")
-  cat("   [outputFile]: Path to output File (OPTIONAL) Default: inputDir/inputFile.png\n")
+  cat("   [outputFile]: Path to output File (OPTIONAL) Default: inputDir/inputFile.pdf\n")
   cat("   [replaceFlag]: (OPTIONAL) If set to a 0, then if output file exits, the run will quit and not replace it, DEFAULT:0\n")  
 }
 
@@ -23,7 +22,7 @@ if (! file.exists(assoc.data.file)) {
   q(save="no",status=1)
 }
 
-output.file <- sprintf("%s.png",assoc.data.file)
+output.file <- sprintf("%s.pdf",assoc.data.file)
 if (nargs > 1) {
   output.file <- args[[2]] # Output File name
 }
@@ -48,6 +47,7 @@ if ( (!replace.flag) & file.exists(output.file)) {
 # Load association data (assoc.data)
 load(assoc.data.file)
 #colnames(assoc.data$assoc.matrix) <- gsub("GM12878|K562|HelaS3|Hepg2|H1hesc", "", toupper(colnames(assoc.data$assoc.matrix)), ignore.case=T)
+#assoc.data$assoc.matrix <- filter.cols(assoc.data$assoc.matrix)
 assoc.data$assoc.matrix <- filter.cols(assoc.data$assoc.matrix)
 colnames(assoc.data$assoc.matrix) <- standardize.name(names=colnames(assoc.data$assoc.matrix))
 #assoc.data$assoc.matrix <- scale(assoc.data$assoc.matrix)
@@ -61,8 +61,10 @@ clust.results <- plot.heatmap(t(assoc.data$assoc.matrix),
              break.type="linear",
              clust.method="ward",
              #dist.metric="pearson",
-             break.lowerbound=1e-4,
-             break.upperbound=0.5,
+             #break.lowerbound=1e-4, # For TF-centric matrices
+             #break.upperbound=0.5,  # For TF-centric matrices
+             break.lowerbound=0.5, # For TF-centric matrices
+             break.upperbound=1.5,  # For TF-centric matrices                              
              scale="none")
 
 clust.results$assoc.data.file <- assoc.data.file
