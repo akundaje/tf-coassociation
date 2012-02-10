@@ -183,7 +183,8 @@ filter.cols <- function(data,rm.treatments=F) {
                 "expr.val")
   if (rm.treatments) {
     rem.cols <- c(rem.cols,
-                  colnames(data)[grep("IFNa|IFNg",colnames(data),ignore.case=T)])
+                  colnames(data)[grep("IFNa|IFNg|Pravastin|Insulin|Forskolin",colnames(data),ignore.case=T)])
+    #Pol2|Taf1|Taf7|Tbp|Gtf|bE2F6|Gata2UChicg|bGata2|bYy1
   }
   rm.idx <- match(rem.cols, colnames(data))
   rm.idx <- rm.idx[! is.na(rm.idx)]
@@ -217,7 +218,7 @@ filter.rows <- function(data,rm.treatments=F) {
                 "expr.val")
   if (rm.treatments) {
     rem.cols <- c(rem.cols,
-                  colnames(data)[grep("IFNa|IFNg",colnames(data),ignore.case=T)])
+                  colnames(data)[grep("IFNa|IFNg|Pravastin|Insulin|Forskolin",colnames(data),ignore.case=T)])
   }
   rm.idx <- match(rem.rows, rownames(data))
   rm.idx <- rm.idx[! is.na(rm.idx)]
@@ -685,7 +686,7 @@ make.assoc.classf.posneg.dataset <- function(pos.assoc.data , neg.assoc.data, rm
 
 make.tf.centric.tf.to.expr.dataset <- function(assoc.data,
                                     peak.distance.expr.bed.file,                                    
-                                    rm.zero.expr=NA){
+                                    low.expr.thresh=NA){
   # ===================================
   # Create Gene Centric expression dataset
   # ===================================  
@@ -711,8 +712,8 @@ make.tf.centric.tf.to.expr.dataset <- function(assoc.data,
   names(y.vals) <- as.character(distance.table$peak.id)
   
   # Remove zero valued expression data if required
-  if (!is.na(rm.zero.expr)) {
-    y.vals <- y.vals[y.vals>rm.zero.expr]
+  if (!is.na(low.expr.thresh)) {
+    y.vals <- y.vals[y.vals>low.expr.thresh]
   }
   
   # Match gene names for expr and tf data
@@ -775,7 +776,8 @@ run.cv.rulefit <- function(rulefit.results, nfold=10) {
   if ( any(grepl( pattern="rmse", x=names(rulefit.results$cv), fixed=T)) ) {
     rulefit.results$cv$rsquare <- 1 - ( rulefit.results$cv$rmse^2 / 
       mean((rulefit.results$dataset$y.vals - mean(rulefit.results$dataset$y.vals,na.rm=T))^2 ,na.rm=T) )
-  }
+    cat("\tR=",sqrt(rulefit.results$cv$rsquare),"\n")
+  }    
   return(rulefit.results)
 }
 
@@ -2937,7 +2939,7 @@ batch.read.gc.assoc.file.to.Rdata <- function( assoc.dir , output.dir=NULL) {
   }
 }
 
-consolidate.expression.data <- function( expr.file, norm.type="asinh", pseudocount=1e-5, process.reps="average" ) {
+consolidate.expression.data <- function( expr.file, norm.type="asinh", pseudocount=1, process.reps="indiv" ) {
   # Reads in RNA/CAGE tables, takes log2 transform and then averages replicates
   # expr.file: expression data, different columns for different expression data types
   # norm.type: normalization mode
@@ -3028,7 +3030,9 @@ consolidate.expression.data <- function( expr.file, norm.type="asinh", pseudocou
 make.gene.centric.tf.to.expr.dataset <- function(assoc.data,    # Gene centric association dataset
                                                  expr,    # expression dataset
                                                  filter.expr=c("Cy","plus","Cage"),   # terms to filter columns of expr by (grep)
-                                                 rm.zero.expr=NA  # will remove genes whose expression values are < rm.zero.expr
+                                                 low.expr.thresh=NA,  # will remove genes whose expression values are > 2*low.expr.thresh but whose feature support <= min.feature.support                                                 
+                                                 min.feature.support=2, # minimum number of features to be present to consider a training/test example
+                                                 rm.low.expr=F # If set to T, will remove low expression genes
                                                  ){
   # ===================================
   # Create Gene Centric expression dataset
@@ -3041,10 +3045,9 @@ make.gene.centric.tf.to.expr.dataset <- function(assoc.data,    # Gene centric a
     load(assoc.data)    
   }
 
-  # Remove genes for which there is no TF data
+  # Remove unwanted columns
   x.vals <- filter.cols(assoc.data$assoc.matrix,rm.treatments=T)
-  x.vals <- x.vals[ (apply(x.vals,1,function(x) sum(as.numeric(x>0),na.rm=T))>-1) , ]
-  
+   
   # Load expression data
   if (is.character(expr)) {
     load(expr)    
@@ -3052,7 +3055,7 @@ make.gene.centric.tf.to.expr.dataset <- function(assoc.data,    # Gene centric a
   
   # Get specific expression data type
   expr.types <- colnames(expr)
-#   filter.expr <- c("Cy","plus","Cage")
+  #   filter.expr <- c("Cy","plus","Cage")
   for (i in filter.expr) {
     expr.types <- expr.types[grep(i,expr.types,ignore.case=T)]
   }
@@ -3063,27 +3066,54 @@ make.gene.centric.tf.to.expr.dataset <- function(assoc.data,    # Gene centric a
   cat(expr.types,"\n")
   y.vals <- expr[,expr.types]
   names(y.vals) <- rownames(expr)
-  y.vals <- y.vals - min(y.vals) # Make the y values start at 0
   
-  # Remove low expression data if required
-  if (!is.na(rm.zero.expr)) {
-    y.vals <- y.vals[y.vals>rm.zero.expr]
-  }
+  # Make the y values start at 0
+  y.vals <- y.vals - min(y.vals) 
   
   # Match gene names for expr and tf data
   common.gene.names <- intersect(names(y.vals),rownames(x.vals))
   x.vals <- x.vals[ match(common.gene.names,rownames(x.vals)) , ]
   y.vals <- y.vals[ match(common.gene.names,names(y.vals)) ]
-      
+  
+  # Remove genes for which there is no TF data and expression values are high
+  rmidx <- (apply(x.vals,1,function(x) sum(as.numeric(x>0),na.rm=T)) <= min.feature.support )
+  cat(sprintf("%d of %d genes do not pass min.support\n",sum(rmidx),length(rmidx)))  
+  if (!is.na(low.expr.thresh)) {
+    rmidx <- rmidx & (y.vals > 2*low.expr.thresh)
+    cat(sprintf("%d of %d genes do not pass min.support AND have high expression\n",sum(rmidx),length(rmidx)))
+  }
+  
+  y.vals <- y.vals[!rmidx]
+  x.vals <- x.vals[!rmidx, ]
+  
+  # Remove low expression data if required
+  if (!is.na(low.expr.thresh) & rm.low.expr ) {    
+    keepidx <- (y.vals>low.expr.thresh)
+    cat(sprintf("%d of %d genes pass low expression threshold\n",sum(keepidx),length(keepidx)))
+    y.vals <- y.vals[keepidx]
+    x.vals <- x.vals[keepidx,]
+  }
+  
+  cat("Final number of genes = ",length(y.vals),"\n")
+  cat("\t(expr <= 0) = ",sum(y.vals<=0),"\n")
+  cat("\t(expr <= 1) = ",sum(y.vals<=1),"\n")
+  cat("\t(expr <= 2) = ",sum(y.vals<=2),"\n")
+  cat("\t(expr <= 5) = ",sum(y.vals<=5),"\n")
+  
   return(list(x.vals=x.vals,y.vals=y.vals,target.name=assoc.data$target.name))
 }
 
 learn.tf.to.expr.rulefit.model <- function(assoc.data,    # Gene centric association dataset
                                            expr,    # expression dataset
                                            filter.expr=c("Cy","plus","Cage"),   # terms to filter columns of expr by (grep)
-                                           rm.zero.expr=NA,  # will remove genes whose expression values are < rm.zero.expr
+                                           low.expr.thresh=NA,  # will remove genes whose expression values are > 2*low.expr.thresh but whose feature support <= min.feature.support
                                            two.stage.model=T,
-                                           randomize=NA # Set to 0 (randomize rows and cols), 1 (randomize rows), 2 (randomize columns)
+                                           randomize=NA, # Set to 0 (randomize rows and cols), 1 (randomize rows), 2 (randomize columns)
+                                           min.feature.support=2, # minimum number of features to be present to consider a training/test example
+                                           rm.low.expr=F, # Remove low expression genes
+                                           tree.size=6, # average tree size for ruleFit
+                                           test.reps=3, # number of test reps for model fitting
+                                           model.type="both" # linear, rules or both
                                            ){
   # ===================================
   # Sample a rulefit model
@@ -3096,33 +3126,68 @@ learn.tf.to.expr.rulefit.model <- function(assoc.data,    # Gene centric associa
   # ===================================  
   # assoc.data$assoc.matrix
   # assoc.data$target.name
-  tree.size=10
-  test.reps=3
+  cat("Parameter: average tree size=",tree.size,"\n")  
+  cat("Parameter: model fitting test reps=",test.reps,"\n")
+  cat("Parameter: Model type=",model.type,"\n")
+  cat("Parameter: Min feature support=",min.feature.support,"\n")
+  cat("Parameter: Low expression threshold=",low.expr.thresh,"\n")
+  cat("Parameter: Remove low expression=",rm.low.expr,"\n")
+  cat("Parameter: Randomization=",randomize,"\n")
   
+  # Load association data if required
   if (is.character(assoc.data)) {
     load(assoc.data)
   }
   
+  # Randomize the association data if randomize is on
   if (!is.na(randomize)) {
     assoc.data$assoc.matrix <- randomize.assoc.matrix(assoc.data,rand.dim=randomize,change.row.names=F)
   }
   
-  assoc.classf.data <- make.gene.centric.tf.to.expr.dataset(assoc.data, expr, filter.expr, rm.zero.expr)
+  # Create dataset
+  assoc.classf.data <- make.gene.centric.tf.to.expr.dataset(assoc.data, 
+                                                            expr, 
+                                                            filter.expr,
+                                                            low.expr.thresh,
+                                                            min.feature.support,
+                                                            rm.low.expr)
   
   if (two.stage.model) {
     class.dataset <- assoc.classf.data
-    min.val <- min(class.dataset$y.vals)
+    if (is.na(low.expr.thresh)) {
+      min.val <- min(class.dataset$y.vals)
+    } else {
+      min.val <- low.expr.thresh
+    }
+    # Learn classification model
     class.dataset$y.vals[class.dataset$y.vals > min.val] <- 1 # Set non-zero values to 1
     class.dataset$y.vals[class.dataset$y.vals <= min.val] <- -1 # Set non-zero values to 1
-    rfmod.class <- run.rulefit(class.dataset, mode="class",tree.size=tree.size,test.reps=test.reps) # Learn classification model
+    cat("Total Examples=",length(class.dataset$y.vals),"\n")
+    cat("Positive Examples=",sum(class.dataset$y.vals==1),"\n")
+    cat("Negative Examples=",sum(class.dataset$y.vals==-1),"\n")
+    rfmod.class <- run.rulefit(class.dataset,
+                               mode="class",
+                               model.type=model.type,
+                               tree.size=tree.size,
+                               test.reps=test.reps) 
     
+    # Learn Regression model
     regress.dataset <- assoc.classf.data
-    keep.idx <- (regress.dataset$y.vals > min.val) # Only keep non-zero values
+    keep.idx <- (regress.dataset$y.vals > min.val) # Only keep non-low values
     regress.dataset$x.vals <- regress.dataset$x.vals[keep.idx,]
     regress.dataset$y.vals <- regress.dataset$y.vals[keep.idx]
-    rfmod.regress <- run.rulefit(regress.dataset, mode="regress",tree.size=tree.size,test.reps=test.reps)
+    cat("Total Examples=",length(regress.dataset$y.vals),"\n")    
+    rfmod.regress <- run.rulefit(regress.dataset, 
+                                 mode="regress",
+                                 model.type=model.type,
+                                 tree.size=tree.size,
+                                 test.reps=test.reps)
   } else {
-    rfmod <- run.rulefit(assoc.classf.data, mode="regress",tree.size=tree.size,test.reps=test.reps)
+    rfmod <- run.rulefit(assoc.classf.data,
+                         model.type=model.type,
+                         mode="regress",
+                         tree.size=tree.size,
+                         test.reps=test.reps)
   } 
   
   # Create place holder for variable importance
@@ -3148,7 +3213,11 @@ learn.tf.to.expr.rulefit.model <- function(assoc.data,    # Gene centric associa
                           vi=vi,
                           int.strength=int.strength,
                           pair.interactions=pair.interactions)
-    class.results <- run.cv.rulefit(class.results)
+    class.results <- get.var.imp( run.cv.rulefit(class.results),class=0 )
+    if (is.na(randomize)) {
+#       class.results <- get.int.strength( class.results, use.null=F )
+#       class.results <- get.all.partner.pair.interactions( class.results, use.import=T, use.null=F )
+    }
     
     # Create regression results
     regress.results <- list(rfmod=rfmod.regress,
@@ -3156,15 +3225,22 @@ learn.tf.to.expr.rulefit.model <- function(assoc.data,    # Gene centric associa
                             vi=vi,
                             int.strength=int.strength,
                             pair.interactions=pair.interactions)
-    regress.results <- run.cv.rulefit(regress.results)
+    regress.results <- get.var.imp( run.cv.rulefit(regress.results), class=0 )    
+    
+    if (is.na(randomize)) {
+#       regress.results <- get.int.strength( regress.results, use.null=F)
+#       regress.results <- get.all.partner.pair.interactions( regress.results, use.import=T, use.null=F )      
+    }
     
     # Combine predictions
     regress.results <- restore.rf.model(regress.results)
     y.regress <- rfpred(class.results$dataset$x.vals)    
     y.pred <- as.numeric(class.results$cv$lo > 0) * y.regress
-    
+    comb.rsquare <- compute.rsquare(assoc.classf.data$y.vals, y.pred)
+    cat("Combined model R=",sqrt(comb.rsquare),"\n")
     combined.results <- list(dataset=assoc.classf.data,
-                             y.pred=y.pred)
+                             y.pred=y.pred,
+                             cv=list(rsquare=comb.rsquare))
     
     rulefit.results <- list(class.results=class.results,
                             regress.results=regress.results,
@@ -3177,7 +3253,11 @@ learn.tf.to.expr.rulefit.model <- function(assoc.data,    # Gene centric associa
                             vi=vi,
                             int.strength=int.strength,
                             pair.interactions=pair.interactions)
-    rulefit.results <- run.cv.rulefit(rulefit.results)
+    rulefit.results <- get.var.imp(run.cv.rulefit(rulefit.results),class=0)
+    if (is.na(randomize)) {
+#       rulefit.results <- get.int.strength( rulefit.results, use.null=F )
+#       rulefit.results <- get.all.partner.pair.interactions( rulefit.results, use.import=T, use.null=F )
+    }
   }
   
   return( rulefit.results )
