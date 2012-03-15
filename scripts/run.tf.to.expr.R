@@ -6,7 +6,7 @@ two.stage <- T
 low.expr.thresh <- 0
 rm.low.expr <- F
 min.feature.support <- 3
-tree.size <- 6
+tree.size <- 10
 test.reps <- 3
 model.type <- "both"
 

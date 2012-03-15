@@ -61,7 +61,7 @@
 # =================================================================================================================================
 # =================================================================================================================================
 
-initialize.rulefit <- function( work.dir="/media/fusion10/work/encode/learning/combinatorics/src/rulefit" , rf.package.path=NA){
+initialize.rulefit <- function( work.dir="/media/backup/work/encode/learning/combinatorics/src/rulefit" , rf.package.path=NA){
   # ===================================
   # Initializes a rulefit directory to start analyses
   # ===================================
@@ -1339,59 +1339,39 @@ learn.posneg.rulefit.model <- function(pos.assoc.data , neg.assoc.data, rm.targe
     pair.interactions.null.std=pair.interactions.null.std) )
 }
   
-plot.heatmap <- function(data,
-                         use.as.dist=F,
-                         to.file=NULL, 
-                         row.title="rows", 
-                         col.title="cols", 
-                         title.name=NULL, 
-                         filt.thresh=1e-7, 
-                         pseudo.count=1e-30, 
-                         logval=F, 
-                         replace.diag=T, 
-                         replace.na=T,
-                         num.breaks=255, 
-                         break.type="quantile",
-                         break.lowerbound=filt.thresh,
-                         break.upperbound=NA,
-                         clust.method="average", 
-                         dist.metric="euclidean", 
-                         scale="none", 
-                         row.cluster=T, 
-                         col.cluster=T,
-                         symm.cluster=F,
-                         show.dendro="both") {
+plot.heatmap <- function(data, # data: any data frame (Rows: are binding sites, Cols: partner TFs)
+                         use.as.dist=F, # use.as.dist: use data directly as a similarity matrix (data must be symmetric matrix/data frame)
+                         to.file=NULL, # to.file: png/pdf file that you want to save the figure to (default: no saving)
+                         row.title="rows", # row.title: axis title for rows
+                         col.title="cols", # col.title: axis title for columns
+                         title.name=NULL, # title.name: plot title
+                         filt.thresh=1e-7, # filt.thresh: used to remove rows and cols with all values < filt.thresh
+                         pseudo.count=1e-30, # pseudo.count: uniform random numbers scaled by pseudo.count are added to the matrix to avoid 0 std for constant columns
+                         logval=F, # logval: T/F . If set to T, then the matrix is log transformed before clustering. (filt.thresh will also be log transformed)
+                         replace.diag=T, # replace.diag: If set to T, then matrix diagonal values are replaced by maximum value in the matrix
+                         replace.na=T, # replace.na: If set of T, then NA values are replaced by minimum value in the matrix
+                         num.breaks=255, # num.breaks: number of breaks in colors (The breaks correspond to uniformly sampled quantiles from the distribution of values in the matrix, excluding all values below filt.thresh)
+                         break.type="quantile", # break.type: type of color breaks, quantile: means the colors are adjusted to uniformly spaced quantiles, linear: colors are placed on the linear scale
+                         break.lowerbound=filt.thresh, # break.lowerbound: For values below break.lowerbound are ignored and set to the lowest color
+                         break.upperbound=NA, # break.upperbound: For values above break.upperbound are ignored and set to the highest color
+                         clust.method=c("average","average"), # clust.method: linkage method e.g. "complete/average/ward/single" . Either a single value or a pair of values c(row,col) will apply to clustering rows and columns
+                         dist.metric=c("euclidean","euclidean"), # dist.metric="euclidean/pearson/spearman/binary/manhattan". Either a single value or a pair of values c(row,col) will apply to clustering rows and columns
+                         scale="none", # scale: "row", "col", "none" whether to standardize rows/columns or none
+                         row.cluster=T, # row.cluster=T : T or F to cluster rows OR a numeric vector with the desired row order OR a dendrogram object
+                         col.cluster=T, # col.cluster=T : T or F to cluster columns OR a numeric vector with the desired row order OR a dendrogram object
+                         row.optimal.order=F, # row.optimal.order=F : T or F to arrange row dendrogram in optimal order
+                         col.optimal.order=F, # col.optimal.order=F : T or F to arrange col dendrogram in optimal order
+                         symm.cluster=F, # symm.cluster=F : if set to T then column clustering is set equal to row clustering
+                         show.dendro="both" # show.dendro="both"  : which dendrograms to show "row", "column", "both" or "none"
+                         ) {
   # ===================================
   # Plot clustered heatmap of associations
-  # data: any data frame (Rows: are binding sites, Cols: partner TFs)
-  # use.as.dist: use data directly as a similarity matrix (data must be symmetric matrix/data frame)
-  # to.file: png/pdf file that you want to save the figure to (default: no saving)
-  # row.title: axis title for rows
-  # col.title: axis title for columns
-  # title.name: plot title
-  # filt.thresh: used to remove rows and cols with all values < filt.thresh
-  # pseudo.count: uniform random numbers scaled by pseudo.count are added to the matrix to avoid 0 std for constant columns
-  # logval: T/F . If set to T, then the matrix is log transformed before clustering. (filt.thresh will also be log transformed)
-  # replace.diag: If set to T, then matrix diagonal values are replaced by maximum value in the matrix
-  # replace.na: If set of T, then NA values are replaced by minimum value in the matrix
-  # num.breaks: number of breaks in colors (The breaks correspond to uniformly sampled quantiles from the distribution of values in the matrix, excluding all values below filt.thresh)
-  # break.type: type of color breaks, quantile: means the colors are adjusted to uniformly spaced quantiles, linear: colors are placed on the linear scale
-  # break.lowerbound: For values below break.lowerbound are ignored and set to the lowest color
-  # break.upperbound: For values above break.upperbound are ignored and set to the highest color
-  # clust.method: linkage method e.g. "complete/average/ward/single"
-  # dist.metric="euclidean/pearson/spearman/binary/manhattan"  
-  # scale: "row", "col", "none" whether to standardize rows/columns or none
-  # row.cluster=T : T or F to cluster rows OR a numeric vector with the desired row order OR a dendrogram object
-  # col.cluster=T : T or F to cluster columns OR a numeric vector with the desired row order OR a dendrogram object
-  # symm.cluster=F : if set to T then column clustering is set equal to row clustering
-  # show.dendro="both"  : which dendrograms to show "row", "column", "both" or "none"
   # NOTE: This is currently horrendously slow for large number of rows
-  # TODO Improvements:
-  # (1) Don't cluster rows/cols if there are too many  
   # ===================================
-  library(fastcluster)
-  library(gplots)
-  library(fBasics)
+  library(fastcluster) # fast hclust
+  library(gplots) # heatmap2
+  library(fBasics) # color scales
+  library(cba) # adds optimal ordering functionality
   
   # Remove columns with all NAs
   #data <- filter.cols(data)
@@ -1605,46 +1585,115 @@ plot.heatmap <- function(data,
 #   clean.data[clean.data < filt.thresh] <- 0
 #   clean.data <- clean.data + (pseudo.count * matrix( data=runif(prod(clean.data)), nrow(clean.data), ncol(clean.data) ) )
   
+  if (length(dist.metric)==1) {
+    dist.metric <- c(dist.metric,dist.metric)
+  }
+  if (length(clust.method)==1) {
+    clust.method <- c(clust.method,clust.method)
+  }
+  
   row.cluster.results <- T
   col.cluster.results <- T
-  if (grepl(pattern="pearson|spearman",x=dist.metric)) {
+  
+  # Cluster rows
+  if (grepl(pattern="pearson|spearman",x=dist.metric[1])) { # If pearson or spearman, precompute distance matrix
     if (is.logical(row.cluster)) {
       if (row.cluster) {
-        if (use.as.dist) {
-          row.cluster.results <- hclust( as.dist( -clean.data ), method=clust.method )  
-        } else {        
-          row.cluster.results <- hclust( as.dist( 1 - cor( t(clean.data),method=dist.metric,use="na.or.complete" )^2),method=clust.method )
+        if (use.as.dist) { # Use data as distance measures directly
+          row.cluster.results <- hclust( as.dist( -clean.data ), method=clust.method[1] )
+          # Compute optimal ordering if required
+          if (row.optimal.order) {            
+            new.order <- order.optimal( as.dist( -clean.data ), row.cluster.results$merge)
+            row.cluster.results$merge <- new.order$merge
+            row.cluster.results$order <- new.order$order
+          }          
+        } else { # Use data as feature matrices and compute distance measure
+          temp.dist <- as.dist( 1 - cor( t(clean.data),method=dist.metric[1],use="na.or.complete" )^2)
+          row.cluster.results <- hclust( temp.dist ,method=clust.method[1] )
+          # Compute optimal ordering if required
+          if (row.optimal.order) {            
+            new.order <- order.optimal( temp.dist, row.cluster.results$merge)            
+            row.cluster.results$merge <- new.order$merge
+            row.cluster.results$order <- new.order$order
+          }
+          rm(temp.dist)
         }
         row.cluster <- as.dendrogram(row.cluster.results)
       }  
     }
+  } else { # if NOT pearson or spearman
+    if (is.logical(row.cluster)) {
+      if (row.cluster) {        
+        if (use.as.dist) {
+          row.cluster.results <- hclust( as.dist( -clean.data ), method=clust.method[1] )  
+          # Compute optimal ordering if required
+          if (row.optimal.order) {            
+            new.order <- order.optimal( as.dist( -clean.data ), row.cluster.results$merge)
+            row.cluster.results$merge <- new.order$merge
+            row.cluster.results$order <- new.order$order
+          }                    
+        } else {
+          temp.dist <- dist( clean.data, method=dist.metric[1] )
+          row.cluster.results <- hclust( temp.dist, method=clust.method[1] )  
+          if (row.optimal.order) {            
+            new.order <- order.optimal( temp.dist, row.cluster.results$merge)            
+            row.cluster.results$merge <- new.order$merge
+            row.cluster.results$order <- new.order$order
+          }
+          rm(temp.dist)          
+        }        
+        row.cluster <- as.dendrogram(row.cluster.results)
+      }  
+    }
+  }
+  
+  # Cluster columns
+  if (grepl(pattern="pearson|spearman",x=dist.metric[2])) {    
     if (is.logical(col.cluster)) {
       if (col.cluster) {
-        if (use.as.dist) {
-          col.cluster.results <- hclust( as.dist( -t(clean.data)), method=clust.method )
-        } else {        
-          col.cluster.results <- hclust( as.dist( 1 - cor( clean.data,method=dist.metric,use="na.or.complete" )^2),method=clust.method )
+        if (use.as.dist) {          
+          col.cluster.results <- hclust( as.dist( -t(clean.data)), method=clust.method[2] )
+          # Compute optimal ordering if required
+          if (col.optimal.order) {            
+            new.order <- order.optimal( as.dist( -t(clean.data) ), col.cluster.results$merge)
+            col.cluster.results$merge <- new.order$merge
+            col.cluster.results$order <- new.order$order
+          }                    
+        } else {
+          temp.dist <- as.dist( 1 - cor( clean.data,method=dist.metric[2],use="na.or.complete" )^2)
+          col.cluster.results <- hclust( temp.dist ,method=clust.method[2] )
+          # Compute optimal ordering if required
+          if (col.optimal.order) {            
+            new.order <- order.optimal( temp.dist, col.cluster.results$merge)            
+            col.cluster.results$merge <- new.order$merge
+            col.cluster.results$order <- new.order$order
+          }
+          rm(temp.dist)                    
         }
         col.cluster <- as.dendrogram(col.cluster.results)        
       }  
     }
   } else {
-    if (is.logical(row.cluster)) {
-      if (row.cluster) {        
-        if (use.as.dist) {
-          row.cluster.results <- hclust( as.dist( -clean.data ), method=clust.method )  
-        } else {
-          row.cluster.results <- hclust( dist( clean.data, method=dist.metric ), method=clust.method )  
-        }        
-        row.cluster <- as.dendrogram(row.cluster.results)
-      }  
-    }
     if (is.logical(col.cluster)) {
       if (col.cluster) {
         if (use.as.dist) {
-          col.cluster.results <- hclust( as.dist( -t(clean.data)), method=clust.method )
+          col.cluster.results <- hclust( as.dist( -t(clean.data)), method=clust.method[2] )
+          # Compute optimal ordering if required
+          if (col.optimal.order) {            
+            new.order <- order.optimal( as.dist( -t(clean.data) ), col.cluster.results$merge)
+            col.cluster.results$merge <- new.order$merge
+            col.cluster.results$order <- new.order$order
+          }                          
         } else {
-          col.cluster.results <- hclust( dist( t(clean.data), method=dist.metric ), method=clust.method ) 
+          temp.dist <- dist( t(clean.data), method=dist.metric[2] )
+          col.cluster.results <- hclust( temp.dist, method=clust.method[2] ) 
+          # Compute optimal ordering if required
+          if (col.optimal.order) {            
+            new.order <- order.optimal( temp.dist, col.cluster.results$merge)            
+            col.cluster.results$merge <- new.order$merge
+            col.cluster.results$order <- new.order$order
+          }
+          rm(temp.dist)                              
         }        
         col.cluster <- as.dendrogram(col.cluster.results)        
       }  
@@ -1668,7 +1717,7 @@ plot.heatmap <- function(data,
              Rowv = row.cluster, 
              Colv = col.cluster,
              dendrogram=show.dendro,
-             hclustfun = function(x) hclust(x,method=clust.method),
+             hclustfun = function(x) hclust(x,method=clust.method[1]),
              cexRow = cex.val,
              cexCol = cex.val,
              scale=scale,
@@ -1697,7 +1746,7 @@ plot.heatmap <- function(data,
              Rowv = row.cluster, 
              Colv = col.cluster,
              dendrogram=show.dendro,   
-             hclustfun = function(x) hclust(x,method=clust.method),
+             hclustfun = function(x) hclust(x,method=clust.method[1]),
              cexRow = cex.val,
              cexCol = cex.val,
              scale=scale,
@@ -1726,7 +1775,8 @@ plot.heatmap <- function(data,
   if (!is.null(to.file)) { dev.off() }
   
   invisible(list(row.cluster=row.cluster.results,
-                 col.cluster=col.cluster.results))
+                 col.cluster=col.cluster.results,
+                 clustered.data=clean.data))
 }
 
 plot.importance <- function(rulefit.results, output.dir=NULL, output.filename=NULL, ext="pdf", filt.thresh=5){
@@ -3215,8 +3265,8 @@ learn.tf.to.expr.rulefit.model <- function(assoc.data,    # Gene centric associa
                           pair.interactions=pair.interactions)
     class.results <- get.var.imp( run.cv.rulefit(class.results),class=0 )
     if (is.na(randomize)) {
-#       class.results <- get.int.strength( class.results, use.null=F )
-#       class.results <- get.all.partner.pair.interactions( class.results, use.import=T, use.null=F )
+      class.results <- get.int.strength( class.results, use.null=F )
+      class.results <- get.all.partner.pair.interactions( class.results, use.import=T, use.null=F )
     }
     
     # Create regression results
@@ -3228,8 +3278,8 @@ learn.tf.to.expr.rulefit.model <- function(assoc.data,    # Gene centric associa
     regress.results <- get.var.imp( run.cv.rulefit(regress.results), class=0 )    
     
     if (is.na(randomize)) {
-#       regress.results <- get.int.strength( regress.results, use.null=F)
-#       regress.results <- get.all.partner.pair.interactions( regress.results, use.import=T, use.null=F )      
+      regress.results <- get.int.strength( regress.results, use.null=F)
+      regress.results <- get.all.partner.pair.interactions( regress.results, use.import=T, use.null=F )      
     }
     
     # Combine predictions
@@ -3255,8 +3305,8 @@ learn.tf.to.expr.rulefit.model <- function(assoc.data,    # Gene centric associa
                             pair.interactions=pair.interactions)
     rulefit.results <- get.var.imp(run.cv.rulefit(rulefit.results),class=0)
     if (is.na(randomize)) {
-#       rulefit.results <- get.int.strength( rulefit.results, use.null=F )
-#       rulefit.results <- get.all.partner.pair.interactions( rulefit.results, use.import=T, use.null=F )
+      rulefit.results <- get.int.strength( rulefit.results, use.null=F )
+      rulefit.results <- get.all.partner.pair.interactions( rulefit.results, use.import=T, use.null=F )
     }
   }
   
