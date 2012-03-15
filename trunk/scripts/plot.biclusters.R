@@ -59,12 +59,14 @@ clust.results <- plot.heatmap(t(assoc.data$assoc.matrix),
              filt.thresh=NA, 
              replace.diag=F, 
              break.type="linear",
-             clust.method="ward",
-             #dist.metric="pearson",
-             #break.lowerbound=1e-4, # For TF-centric matrices
-             #break.upperbound=0.5,  # For TF-centric matrices
-             break.lowerbound=0.5, # For TF-centric matrices
-             break.upperbound=1.5,  # For TF-centric matrices                              
+             clust.method=c("average","ward"),
+             dist.metric=c("pearson","euclidean"),
+             break.lowerbound=1e-4, # For TF-centric matrices
+             break.upperbound=0.5,  # For TF-centric matrices
+             #break.lowerbound=0.5, # For TF-centric matrices
+             #break.upperbound=1.5,  # For TF-centric matrices
+             row.optimal.order=T,
+             col.optimal.order=F,                              
              scale="none")
 
 clust.results$assoc.data.file <- assoc.data.file
