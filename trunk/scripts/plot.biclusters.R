@@ -22,7 +22,7 @@ if (! file.exists(assoc.data.file)) {
   q(save="no",status=1)
 }
 
-output.file <- sprintf("%s.pdf",assoc.data.file)
+output.file <- sprintf("%s.png",assoc.data.file)
 if (nargs > 1) {
   output.file <- args[[2]] # Output File name
 }
@@ -66,8 +66,9 @@ clust.results <- plot.heatmap(t(assoc.data$assoc.matrix),
              #break.lowerbound=0.5, # For TF-centric matrices
              #break.upperbound=1.5,  # For TF-centric matrices
              row.optimal.order=T,
-             col.optimal.order=F,                              
-             scale="none")
+             col.optimal.order=T,                              
+             scale="none",
+             show.dendro="none")
 
 clust.results$assoc.data.file <- assoc.data.file
 clust.results$figure.file <- output.file
