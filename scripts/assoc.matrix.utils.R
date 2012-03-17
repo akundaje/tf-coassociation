@@ -1374,36 +1374,47 @@ plot.heatmap <- function(data, # data: any data frame (Rows: are binding sites, 
   library(cba) # adds optimal ordering functionality
   
   # Remove columns with all NAs
-  #data <- filter.cols(data)
-  if (!symm.cluster) {
-    na.idx <- apply( data , 2 , function(x) all(is.na(x)) )
-    data <- data[ , !na.idx]
-    # Remove rows with all NAs
-    na.idx <- apply( data , 1 , function(x) all(is.na(x)) )
-    data <- data[!na.idx, ]  
-  
-    # Remove columns with all very small values
-    if (! is.na(filt.thresh) ) {
-      na.idx <- apply( data , 2 , function(x) all((x<filt.thresh),na.rm=T) )
-      data <- data[ , !na.idx]
-      # Remove rows with all very small values
-      na.idx <- apply( data , 1 , function(x) all((x<filt.thresh),na.rm=T) )
-      data <- data[!na.idx, ]
-    }
+  na.idx <- apply( data , 2 , function(x) all(is.na(x)) )
+  data <- data[ , !na.idx]
+  if (symm.cluster) {
+    data <- data[!na.idx,]
   }
+  # Remove rows with all NAs
+  na.idx <- apply( data , 1 , function(x) all(is.na(x)) )
+  data <- data[!na.idx, ]  
+  if (symm.cluster) {
+    data <- data[,!na.idx]
+  }
+    
+  if (! is.na(filt.thresh) ) {
+    # Remove columns with all very small values
+    na.idx <- apply( data , 2 , function(x) all((x<filt.thresh),na.rm=T) )
+    data <- data[ , !na.idx]
+    if (symm.cluster) {
+      data <- data[!na.idx,]
+    }    
+    # Remove rows with all very small values
+    na.idx <- apply( data , 1 , function(x) all((x<filt.thresh),na.rm=T) )
+    data <- data[!na.idx, ]
+    if (symm.cluster) {
+      data <- data[,!na.idx]
+    }    
+  }
+
   data.size <- dim(data)
   if (data.size[[1]] < 1) {return()}
   
   # Add a small random number to each value to avoid problems with clustering
   clean.data <- as.matrix(data) + (pseudo.count * matrix( data=runif(prod(data.size)), data.size[1], data.size[2]) )
+  
   if (logval) {
     clean.data <- log10(clean.data)
     clean.data[is.infinite(clean.data)] <- NA    
-    if (!is.na(filt.thresh)) { 
-      filt.thresh <- log10(filt.thresh)
-      clean.data <- clean.data - filt.thresh
-      clean.data[which(clean.data < 0)] <- 0
-      }
+#     if (!is.na(filt.thresh)) { 
+#       filt.thresh <- log10(filt.thresh)
+#       clean.data <- clean.data - filt.thresh
+#       clean.data[which(clean.data < 0)] <- 0
+#       }
   }
   breaks.data <- as.vector(clean.data)
   min.val <- min(breaks.data,na.rm=T)
@@ -2452,38 +2463,43 @@ plot.average.pairwise.matrix <- function(rulefit.results, output.dir, output.fil
 #                 break.lowerbound=1e-3,
 #                 break.type="quantile")
   
-  plot.heatmap( data=val.data,
-                use.as.dist=T,
-                show.dendro="none",
-                to.file=output.filename,
-                row.title="Transcription Factors",
-                col.title="Transcription Factors",
-                title.name="",
-                filt.thresh=filter.thresh,
-                pseudo.count=0,
-                logval=T,
-                replace.diag=T,
-                replace.na=T,
-                num.breaks=255,
-                #clust.method="complete",
-                clust.method="ward",
-                break.lowerbound=4.5,                  
-                break.type="linear")  
+  clust.results <- plot.heatmap( data=val.data,
+                                 use.as.dist=F,
+                                 show.dendro="none",
+                                 to.file=output.filename,
+                                 row.title="Transcription Factors",
+                                 col.title="Transcription Factors",
+                                 title.name="",
+                                 filt.thresh=filter.thresh,
+                                 pseudo.count=0,
+                                 logval=T,
+                                 replace.diag=T,
+                                 replace.na=T,
+                                 num.breaks=255,                
+                                 #clust.method="complete",
+                                 clust.method="ward",                
+                                 break.lowerbound=4.5,                  
+                                 break.type="linear",
+                                 row.optimal.order=T,
+                                 col.optimal.order=T)
+  invisible(clust.results)
+  
 }
 
-plot.score.dist.average.pairwise.matrix <- function(rulefit.results, output.dir, output.filename=NA, ext="pdf", filter.thresh=1e-7, feature.type="split") {
+plot.score.dist.average.pairwise.matrix <- function(rulefit.results, # rulefit.results: Rdata file name containing aggregated rulefit.results list OR the aggregated rulefit.results LIST
+                                                    output.dir, # output.dir: directory where you want to save all figure
+                                                    ext="pdf", # ext: OPTIONAL plot type (png/pdf)
+                                                    filter.thresh=1e-7, # filter.thresh: Threshold used
+                                                    feature.type="split" # feature.type: all/null/main/split all: use all features, null: use null features, main: use true features, split: plot main and null on the same plot
+                                                    ) {
   # ===================================
-  # Plots heatmap of average/aggregated conditional pairwise interactions
-  # Takes as input rulefit.results (list) OR
-  # Rdata file name (string) that contains rulefit.results 
+  # Analyzes distribution of interaction scores for
+  # true features and randomized features
+  # - Plots distribution of scores
+  # - Use max of randomized feature interaction score to filter true feature interactions
+  # - Computes fold change of interaction scores (true/randomized)
+  # - Replots a foldchange interaction matrix between true features
   # ===================================  
-  # rulefit.results: Rdata file name containing aggregated rulefit.results list OR the aggregated rulefit.results LIST
-  # output.dir: directory where you want to save all figure
-  # output.filename: OPTIONAL file name (no path)
-  # ext: OPTIONAL plot type (png/pdf)
-  # filter.thresh: Threshold used
-  # feature.type: all/null/main/split all: use all features, null: use null features, main: use true features, split: plot main and null on the same plot
-  # Load rulefit.results if input is a data list
   
   # Load rulefit.results if input is a character vector
   if (is.character(rulefit.results)) {
@@ -2491,6 +2507,7 @@ plot.score.dist.average.pairwise.matrix <- function(rulefit.results, output.dir,
   }
   
   target.name <- rulefit.results$target.name
+
   output.dir <- file.path(output.dir,target.name) 
   # Create output directory if it doesnt exist
   if (!file.exists(output.dir)){
@@ -2498,12 +2515,6 @@ plot.score.dist.average.pairwise.matrix <- function(rulefit.results, output.dir,
   }
 
   plot.title <- sprintf("Pairwise Interactions Score distributions| %s",target.name)
-
-  if (is.na(output.filename)) {
-    output.filename <- file.path( output.dir , sprintf("score.dist.pairwise.int.matrix.%s.%s.%s",feature.type,target.name,ext) )
-  } else {
-    output.filename <- file.path( output.dir , get.file.parts(output.filename)$fullname )
-  }
   
   val.data <- rulefit.results$mean.pairwise.int.matrix
   val.data <- filter.cols( filter.rows(val.data) )
@@ -2547,16 +2558,23 @@ plot.score.dist.average.pairwise.matrix <- function(rulefit.results, output.dir,
     null.vals[is.na(null.vals)] <- min.score
     null.vals <- log10(null.vals)
   }
+
+  # Obtain thresholds based on quantiles of interaction scores of null features
+  thresholds <- NA
+  if (null.exist) {
+    thresholds <- quantile( null.vals, 1-c(0.05,0.01,0.005,0.001,0.0005,0.0001) ) - log10(filter.thresh) #log(filter.thresh) is subtracted
+  }  
+  max.null.val <- max(null.vals,na.rm=T) - log10(filter.thresh) # This is in log10-scale
   
   # Convert to data frames for plotting using ggplot
-  main.vals.data.frame <- data.frame(type="true", log.scores=main.vals - log10(filter.thresh))
+  main.vals.data.frame <- data.frame(type="true", log.scores=main.vals - log10(filter.thresh)) # We have now subtracted filter.thresh
   all.vals.data.frame <- main.vals.data.frame
   if (null.exist) {
-    null.vals.data.frame <- data.frame(type="null", log.scores=null.vals - log10(filter.thresh))
+    null.vals.data.frame <- data.frame(type="null", log.scores=null.vals - log10(filter.thresh)) # We have now subtracted filter.thresh
     all.vals.data.frame <- rbind(all.vals.data.frame, null.vals.data.frame)    
   }
-  
-  # Plot figure
+
+  # Plot score distribution figure
   require(ggplot2)
   if ( any(feature.type == c("all","split")) ) {
     p <- ggplot(all.vals.data.frame) 
@@ -2569,21 +2587,46 @@ plot.score.dist.average.pairwise.matrix <- function(rulefit.results, output.dir,
   if (feature.type == "all") {
     p <- p + geom_density(aes(x=log.scores)) + opts(title=target.name)
   } else {
-    p <- p + geom_density(aes(x=log.scores,color=type,fill=type),alpha=I(0.3), size=I(0.2)) + opts(title=target.name)
-  }
-  
-  # Obtain thresholds based on quantiles of interaction scores of null features
-  thresholds <- NA
-  if (null.exist) {
-    thresholds <- quantile( null.vals, 1-c(0.05,0.01,0.005,0.001,0.0005,0.0001) ) - log10(filter.thresh)
-  }
-  
+    p <- p + geom_histogram(aes(x=log.scores,y=log2(..count.. + 1),color=type,fill=type),binwidth=0.5,alpha=I(0.3),size=I(0.2)) + 
+      geom_vline(xintercept=max.null.val, color="red", linetype=2, size=0.3) + 
+      facet_grid(type ~ .) + 
+      #coord_cartesian(xlim=c(0,7)) +
+      opts(title=target.name)
+  }  
+  output.filename <- file.path( output.dir , sprintf("score.dist.pairwise.int.matrix.%s.%s.%s",feature.type,target.name,ext) )
   ggsave(filename=output.filename, plot=p, dpi=300, width=5,height=5)
   
+  
+  # Filter real interactions
+  true.vals <- val.data[main.row.idx,main.col.idx] # This is in original scale
+  
+  log.fold.true.vals <- ( log10(true.vals) - log10(filter.thresh) ) - max.null.val # log fold change
+  
+  binary.true.vals <- (log.fold.true.vals >= 0) # interactions that pass max.null.thresh
+  binary.true.vals[!is.finite(binary.true.vals)] <- F      
+  
+  rc.idx <- which(binary.true.vals,arr.ind=T)
+  
+  adjacency.interactions <- data.frame(row.idx=rownames(binary.true.vals)[rc.idx[,1]] ,
+                                  col.idx=colnames(binary.true.vals)[rc.idx[,2]] ,
+                                  score=true.vals[rc.idx],
+                                  log.fold.score=log.fold.true.vals[rc.idx])
+  adjacency.interactions <- adjacency.interactions[order(adjacency.interactions$score,decreasing=T) , ]
+  
+  
+  # Plot fold change interaction matrix
+  output.filename <- file.path( output.dir , sprintf("score.dist.pairwise.int.matrix.%s.%s.%s",feature.type,target.name,ext) )
+  clust.results <- plot.heatmap(to.file="temp.pdf",data=10^temp$log.fold.interactions,use.as.dist=F,filt.thresh=1/1000,pseudo.count=0,logval=T,replace.diag=T,replace.na=T,break.type="linear",break.lowerbound=1/10,clust.method="ward",dist.metric="pearson",symm.cluster=T,row.optimal.order=T,col.optimal.order=T)  
+    
   invisible(list(log.main.vals=main.vals,
                  log.null.vals=null.vals,
                  log.all.vals.df=all.vals.data.frame,
-                 thresholds=thresholds))
+                 thresholds=thresholds,
+                 original.interactions=true.vals,
+                 binary.interactions=binary.true.vals,
+                 log.fold.interactions=log.fold.true.vals,
+                 adjacency.interactions=adjacency.interactions
+                 ))
 }
 
 write.table.average.pairwise.matrix <- function(rulefit.results, output.dir, filter.thresh=1e-7) {
@@ -2724,7 +2767,7 @@ compute.proximal.distal.diff.importance <- function(input.dir,
   if (is.null(output.filename)) {
     output.stub <- gsub(pattern="\\.+$",replacement="",x=get.file.parts(peak.distance.file)$name)
     output.filename <- file.path(input.dir,
-                             sprintf("%s.prox.%d.dist.%d.png", output.stub, proximal.cutoff, distal.cutoff))
+                             sprintf("%s.prox.%d.dist.%d.pdf", output.stub, proximal.cutoff, distal.cutoff))
   }
     
   # Read and parse distance file, get proximal and distal peak ids
@@ -2747,7 +2790,7 @@ compute.proximal.distal.diff.importance <- function(input.dir,
   # Reverse peak ids if necessary  
   if (rev.peak.ids) {
     load(all.Rdata.files[1])
-    assoc.data.peak.ids <- rownames(rulefit.results$dataset$x.vals)[rulefit.results$dataset$x.vals == 1]
+    assoc.data.peak.ids <- rownames(rulefit.results$dataset$x.vals)[rulefit.results$dataset$y.vals == 1]
     assoc.data.peak.ranks <- as.numeric( gsub( '(^.*Pk_)|(_[^_]+$)' , '' , assoc.data.peak.ids ) ) # Convert PeakIds to numbers
     assoc.data.peak.ids <- assoc.data.peak.ids[order(assoc.data.peak.ranks)] # Order the assoc.data peak ids
     dtable.peak.ids <- rev( assoc.data.peak.ids ) # dtable.ids is reverse of assoc.ids (each index matches up)
@@ -2907,7 +2950,7 @@ compute.expr.high.low.diff.importance <- function(input.dir,
     p1 <- p1 + opts(axis.text.y = theme_text(size=7,colour="black",hjust=1))
   }
 
-  ggsave(file=output.filename, plot=p1, width=6, height=10, dpi=600)    
+  ggsave(file=output.filename, plot=p1, width=5, height=10, dpi=600)    
   
   return(list(low.vi=low.vi,
               high.vi=high.vi,
