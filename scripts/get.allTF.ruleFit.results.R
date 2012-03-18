@@ -193,6 +193,7 @@ if (nrow(all.vi.matrix) > 0) {
                col.title="TFs",
                title.name="Conditional Partner TF importance",
                filt.thresh=NA,
+               subtract.filt.thresh=F,
                pseudo.count=1e-30,
                logval=F,
                replace.diag=F,
@@ -217,13 +218,14 @@ if (nrow(all.int.strength.matrix) > 0) {
                col.title="TFs",
                title.name="Conditional interaction strength",
                filt.thresh=1e-7,
+               subtract.filt.thresh=T,
                pseudo.count=0,
                logval=T,
                replace.diag=F,
                replace.na=F,
                num.breaks=255,
                clust.method="ward",
-               break.lowerbound=6,
+               break.lowerbound=1e6,
                break.type="linear")
 }
 
@@ -262,6 +264,7 @@ if (nrow(global.pairwise.int.matrix) > 0) {
                                 col.title="Partners of target TF",
                                 title.name="Global pairwise interactions",
                                 filt.thresh=1e-7,
+                                subtract.filt.thresh=T,
                                 pseudo.count=0,
                                 logval=T,
                                 replace.diag=T,
@@ -270,7 +273,7 @@ if (nrow(global.pairwise.int.matrix) > 0) {
                                 clust.method="ward",
                                 dist.metric="spearman",
                                 break.type="linear",
-                                break.lowerbound=4.5,
+                                break.lowerbound=10^4.5,
                                 #break.upperbound=1e-3
                                 )                 
 }

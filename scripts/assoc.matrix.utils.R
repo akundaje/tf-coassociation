@@ -1346,8 +1346,9 @@ plot.heatmap <- function(data, # data: any data frame (Rows: are binding sites, 
                          col.title="cols", # col.title: axis title for columns
                          title.name=NULL, # title.name: plot title
                          filt.thresh=1e-7, # filt.thresh: used to remove rows and cols with all values < filt.thresh
+                         subtract.filt.thresh=F, # subtract filt.thresh from all values and set values < filt.thresh = 0
                          pseudo.count=1e-30, # pseudo.count: uniform random numbers scaled by pseudo.count are added to the matrix to avoid 0 std for constant columns
-                         logval=F, # logval: T/F . If set to T, then the matrix is log transformed before clustering. (filt.thresh will also be log transformed)
+                         logval=F, # logval: T/F . If set to T, then the matrix is log transformed before clustering. (filt.thresh, break.lowerbound and break.upperbound will also be log transformed)
                          replace.diag=T, # replace.diag: If set to T, then matrix diagonal values are replaced by maximum value in the matrix
                          replace.na=T, # replace.na: If set of T, then NA values are replaced by minimum value in the matrix
                          num.breaks=255, # num.breaks: number of breaks in colors (The breaks correspond to uniformly sampled quantiles from the distribution of values in the matrix, excluding all values below filt.thresh)
@@ -1407,15 +1408,21 @@ plot.heatmap <- function(data, # data: any data frame (Rows: are binding sites, 
   # Add a small random number to each value to avoid problems with clustering
   clean.data <- as.matrix(data) + (pseudo.count * matrix( data=runif(prod(data.size)), data.size[1], data.size[2]) )
   
+  # If logval log transform relevant parameters
   if (logval) {
     clean.data <- log10(clean.data)
-    clean.data[is.infinite(clean.data)] <- NA    
-#     if (!is.na(filt.thresh)) { 
-#       filt.thresh <- log10(filt.thresh)
-#       clean.data <- clean.data - filt.thresh
-#       clean.data[which(clean.data < 0)] <- 0
-#       }
+    clean.data[is.infinite(clean.data)] <- NA
+    filt.thresh <- log10(filt.thresh)
+    break.lowerbound <- log10(break.lowerbound)
+    break.upperbound <- log10(break.upperbound)
   }
+
+  # subtract filt.thresh if required
+  if (subtract.filt.thresh & !is.na(filt.thresh)) {
+    clean.data <- clean.data - filt.thresh
+    clean.data[which(clean.data < 0)] <- 0
+  }
+  
   breaks.data <- as.vector(clean.data)
   min.val <- min(breaks.data,na.rm=T)
   max.val <- max(breaks.data,na.rm=T)  
@@ -1978,6 +1985,7 @@ plot.pairwise.matrix <- function(rulefit.results, output.dir, output.filename=NA
                 col.title="Transcription Factors",
                 title.name="",
                 filt.thresh=filter.thresh,
+                subtract.filt.thresh=T,
                 pseudo.count=0,
                 logval=T,
                 replace.diag=T,
@@ -1985,7 +1993,7 @@ plot.pairwise.matrix <- function(rulefit.results, output.dir, output.filename=NA
                 num.breaks=255,
                 #clust.method="complete",
                 clust.method="ward",
-                break.lowerbound=4.5,                  
+                break.lowerbound=10^4.5,                  
                 break.type="linear")  
 }
 
@@ -2471,6 +2479,7 @@ plot.average.pairwise.matrix <- function(rulefit.results, output.dir, output.fil
                                  col.title="Transcription Factors",
                                  title.name="",
                                  filt.thresh=filter.thresh,
+                                 subtract.filt.thresh=T,
                                  pseudo.count=0,
                                  logval=T,
                                  replace.diag=T,
@@ -2478,7 +2487,7 @@ plot.average.pairwise.matrix <- function(rulefit.results, output.dir, output.fil
                                  num.breaks=255,                
                                  #clust.method="complete",
                                  clust.method="ward",                
-                                 break.lowerbound=4.5,                  
+                                 break.lowerbound=10^4.5,                  
                                  break.type="linear",
                                  row.optimal.order=T,
                                  col.optimal.order=T)
@@ -2615,18 +2624,40 @@ plot.score.dist.average.pairwise.matrix <- function(rulefit.results, # rulefit.r
   
   
   # Plot fold change interaction matrix
-  output.filename <- file.path( output.dir , sprintf("score.dist.pairwise.int.matrix.%s.%s.%s",feature.type,target.name,ext) )
-  clust.results <- plot.heatmap(to.file="temp.pdf",data=10^temp$log.fold.interactions,use.as.dist=F,filt.thresh=1/1000,pseudo.count=0,logval=T,replace.diag=T,replace.na=T,break.type="linear",break.lowerbound=1/10,clust.method="ward",dist.metric="pearson",symm.cluster=T,row.optimal.order=T,col.optimal.order=T)  
-    
-  invisible(list(log.main.vals=main.vals,
-                 log.null.vals=null.vals,
-                 log.all.vals.df=all.vals.data.frame,
-                 thresholds=thresholds,
-                 original.interactions=true.vals,
-                 binary.interactions=binary.true.vals,
-                 log.fold.interactions=log.fold.true.vals,
-                 adjacency.interactions=adjacency.interactions
-                 ))
+  output.filename <- file.path( output.dir , sprintf("cond.pairwise.foldchange.int.matrix.matrix.%s.%s",target.name,ext) )
+  log.fold.int.matrix.clust.results <- plot.heatmap(data=10^log.fold.true.vals,
+                                use.as.dist=F,
+                                to.file=output.filename,
+                                filt.thresh=1/1000,
+                                subtract.filt.thresh=F,                    
+                                pseudo.count=0,
+                                logval=T,
+                                replace.diag=T,
+                                replace.na=T,
+                                break.type="linear",
+                                break.lowerbound=1,
+                                clust.method="ward",
+                                dist.metric="euclidean",
+                                symm.cluster=T,
+                                row.optimal.order=T,
+                                col.optimal.order=T)
+  
+  # Save results
+  
+  null.normalization.results <- list(log.main.vals=main.vals,
+                                     log.null.vals=null.vals,
+                                     log.all.vals.df=all.vals.data.frame,
+                                     thresholds=thresholds,
+                                     original.interactions=true.vals,
+                                     binary.interactions=binary.true.vals,
+                                     log.fold.interactions=log.fold.true.vals,
+                                     adjacency.interactions=adjacency.interactions,
+                                     log.fold.int.matrix.clust.results=log.fold.int.matrix.clust.results)
+  
+  output.filename <- file.path( output.dir , sprintf("cond.pairwise.foldchange.int.matrix.matrix.%s.Rdata",target.name) )
+  save(null.normalization.results, file=output.filename)
+  
+  invisible(null.normalization.results)
 }
 
 write.table.average.pairwise.matrix <- function(rulefit.results, output.dir, filter.thresh=1e-7) {
