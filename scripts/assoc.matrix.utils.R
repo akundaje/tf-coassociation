@@ -2625,26 +2625,33 @@ plot.score.dist.average.pairwise.matrix <- function(rulefit.results, # rulefit.r
   
   # Plot fold change interaction matrix
   output.filename <- file.path( output.dir , sprintf("cond.pairwise.foldchange.int.matrix.matrix.%s.%s",target.name,ext) )
-  log.fold.int.matrix.clust.results <- plot.heatmap(data=10^log.fold.true.vals,
+  
+  val.data <- filter.cols( filter.rows(10^log.fold.true.vals) )
+  rownames(val.data) <- standardize.name(rownames(val.data))
+  colnames(val.data) <- standardize.name(colnames(val.data))
+  
+  log.fold.int.matrix.clust.results <- plot.heatmap(data=val.data,
                                 use.as.dist=F,
                                 to.file=output.filename,
-                                filt.thresh=1/1000,
+                                filt.thresh=1,
                                 subtract.filt.thresh=F,                    
-                                pseudo.count=0,
+                                pseudo.count=1e-30,
                                 logval=T,
                                 replace.diag=T,
                                 replace.na=T,
                                 break.type="linear",
                                 break.lowerbound=1,
-                                clust.method="ward",
-                                dist.metric="euclidean",
+                                clust.method="average",
+                                dist.metric="spearman",
                                 symm.cluster=T,
                                 row.optimal.order=T,
-                                col.optimal.order=T)
+                                col.optimal.order=T,
+                                show.dendro="none")
   
   # Save results
   
-  null.normalization.results <- list(log.main.vals=main.vals,
+  null.normalization.results <- list(target.name=target.name,
+                                     log.main.vals=main.vals,
                                      log.null.vals=null.vals,
                                      log.all.vals.df=all.vals.data.frame,
                                      thresholds=thresholds,
