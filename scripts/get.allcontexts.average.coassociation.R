@@ -103,11 +103,13 @@ for (p in unique(global.pairwise.int.table$p1)) {
                                     replace.diag=T,
                                     replace.na=T,
                                     num.breaks=255,
-                                    clust.method="average",
+                                    clust.method="ward",
                                     dist.metric="euclidean",
                                     break.type="linear",
                                     break.lowerbound=10^4.5,
-                                    #break.upperbound=5
+                                    #break.upperbound=5,
+                                    row.optimal.order=T,
+                                    col.optimal.order=T                                    
                                     ),                   
       error = function(e) cat("ERROR ",p,"\n"))
   }
@@ -195,11 +197,13 @@ if (nrow(median.global.pairwise.matrix) > 0) {
                                 replace.diag=T,
                                 replace.na=T,
                                 num.breaks=255,
-                                clust.method="ward",
-                                dist.metric="euclidean",
+                                clust.method="average",
+                                dist.metric="spearman",
                                 break.type="linear",
                                 break.lowerbound=5,
-                                #break.upperbound=5
+                                #break.upperbound=5,
+                                row.optimal.order=T,
+                                col.optimal.order=T                                                                    
                                 )                 
 }
 
@@ -232,11 +236,13 @@ if (nrow(mean.global.pairwise.matrix) > 0) {
                                 replace.diag=T,
                                 replace.na=T,
                                 num.breaks=255,
-                                clust.method="ward",
-                                dist.metric="pearson",
+                                clust.method="average",
+                                dist.metric="spearman",
                                 break.type="linear",
                                 break.lowerbound=5,
-                                #break.upperbound=5
+                                #break.upperbound=5,
+                                row.optimal.order=T,
+                                col.optimal.order=T                                                                    
                                 )                 
 }
 
@@ -268,11 +274,13 @@ if (nrow(max.global.pairwise.matrix) > 0) {
                                 replace.diag=T,
                                 replace.na=T,
                                 num.breaks=255,
-                                clust.method="ward",
-                                dist.metric="pearson",
+                                clust.method="average",
+                                dist.metric="spearman",
                                 break.type="quantile",
                                 break.lowerbound=5.5,
-                                #break.upperbound=5.5
+                                #break.upperbound=5.5,
+                                row.optimal.order=T,
+                                col.optimal.order=T                                                                    
                                 )                 
 }
 
@@ -304,11 +312,13 @@ if (nrow(robust.max.global.pairwise.matrix) > 0) {
                                 replace.diag=T,
                                 replace.na=T,
                                 num.breaks=255,
-                                clust.method="ward",
-                                dist.metric="pearson",
+                                clust.method="average",
+                                dist.metric="spearman",
                                 break.type="linear",
                                 break.lowerbound=5,
-                                #break.upperbound=5
+                                #break.upperbound=5,
+                                row.optimal.order=T,
+                                col.optimal.order=T                                                                    
                                 )                 
 }
 
@@ -341,11 +351,13 @@ if (nrow(mad.global.pairwise.matrix) > 0) {
                                 replace.diag=F,
                                 replace.na=T,
                                 num.breaks=255,
-                                clust.method="ward",
-                                dist.metric="euclidean",
+                                clust.method="average",
+                                dist.metric="spearman",
                                 break.type="linear",
                                 #break.lowerbound=0.5,
-                                #break.upperbound=5
+                                #break.upperbound=5,
+                                row.optimal.order=T,
+                                col.optimal.order=T                                                                    
                                 )                 
 }
 
@@ -377,10 +389,12 @@ if (nrow(std.global.pairwise.matrix) > 0) {
                                 replace.diag=F,
                                 replace.na=T,
                                 num.breaks=255,
-                                clust.method="ward",
-                                dist.metric="euclidean",
+                                clust.method="average",
+                                dist.metric="spearman",
                                 break.type="linear",
                                 #break.lowerbound=1,
-                                #break.upperbound=5
+                                #break.upperbound=5,
+                                row.optimal.order=T,
+                                col.optimal.order=T                                                                    
                                 )                 
 }

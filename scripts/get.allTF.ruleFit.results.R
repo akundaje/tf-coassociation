@@ -38,6 +38,8 @@ out.Rdata.file <- file.path(output.dir, sprintf("%s.allTF.globalVals.Rdata",outp
 out.vi.file <- file.path(output.dir, sprintf("%s.allTF.factor.importance.matrix.xls",output.prefix))
 out.vi.stats.file <- file.path(output.dir, sprintf("%s.allTF.factor.importance.stats.xls",output.prefix))
 out.vi.plot <- file.path(output.dir, sprintf("%s.allTF.factor.importance.pdf",output.prefix))
+out.vi.target.cor.plot <- file.path(output.dir, sprintf("%s.allTF.target.correlation.factor.importance.pdf",output.prefix))
+out.vi.partner.cor.plot <- file.path(output.dir, sprintf("%s.allTF.partner.correlation.factor.importance.pdf",output.prefix))
 
 out.scaled.vi.plot <- file.path(output.dir, sprintf("%s.allTF.scaled.factor.importance.pdf",output.prefix))
 
@@ -187,11 +189,35 @@ all.vi.matrix <- filter.cols(filter.rows(all.vi.matrix))
 rownames(all.vi.matrix) <- standardize.name(rownames(all.vi.matrix))
 colnames(all.vi.matrix) <- standardize.name(colnames(all.vi.matrix))
 if (nrow(all.vi.matrix) > 0) {
-  plot.heatmap(data=all.vi.matrix,
-               to.file=out.vi.plot,                               
-               row.title="Target TF context",
-               col.title="TFs",
-               title.name="Conditional Partner TF importance",
+  clust.results <- plot.heatmap(data=all.vi.matrix,
+                                to.file=out.vi.plot,                               
+                                row.title="Target TF context",
+                                col.title="TFs",
+                                title.name="Conditional Partner TF importance",
+                                filt.thresh=NA,
+                                subtract.filt.thresh=F,
+                                pseudo.count=1e-30,
+                                logval=F,
+                                replace.diag=F,
+                                replace.na=F,
+                                num.breaks=255,
+                                clust.method="ward",
+                                dist.metric="euclidean",
+                                #break.lowerbound=30,
+                                #break.upperbound=80,                 
+                                break.type="linear",
+                                row.optimal.order=T,
+                                col.optimal.order=T)
+  
+  corr.matrix <- as.data.frame(cor(t(as.matrix(clust.results$clustered.data)),use="na.or.complete"))
+  plot.heatmap(data=corr.matrix,
+               symm.cluster=T,
+               row.cluster=as.dendrogram(clust.results$row.cluster),
+               col.cluster=as.dendrogram(clust.results$row.cluster),
+               to.file=out.vi.target.cor.plot,                               
+               row.title="Target TFs",
+               col.title="Target TFs",
+               title.name="Similarity of Target TF contexts",
                filt.thresh=NA,
                subtract.filt.thresh=F,
                pseudo.count=1e-30,
@@ -200,10 +226,37 @@ if (nrow(all.vi.matrix) > 0) {
                replace.na=F,
                num.breaks=255,
                clust.method="ward",
-               #dist.metric="spearman",
-               #break.lowerbound=30,
+               #dist.metric="pearson",
+               break.lowerbound=0.8,
                #break.upperbound=80,                 
-               break.type="linear")
+               break.type="linear",
+               row.optimal.order=T,
+               col.optimal.order=T)
+  
+
+  corr.matrix <- as.data.frame(cor(as.matrix(clust.results$clustered.data),use="na.or.complete"))
+  plot.heatmap(data=corr.matrix,
+               symm.cluster=T,
+               #row.cluster=as.dendrogram(clust.results$col.cluster),
+               #col.cluster=as.dendrogram(clust.results$col.cluster),
+               to.file=out.vi.partner.cor.plot,                               
+               row.title="Partner TFs",
+               col.title="Partner TFs",
+               title.name="Similarity of Partner TFs across all Target TF contexts",
+               filt.thresh=NA,
+               subtract.filt.thresh=F,
+               pseudo.count=1e-30,
+               logval=F,
+               replace.diag=F,
+               replace.na=F,
+               num.breaks=255,
+               clust.method="average",
+               dist.metric="pearson",
+               break.lowerbound=0.5,
+               #break.upperbound=80,                 
+               break.type="linear",
+               row.optimal.order=T,
+               col.optimal.order=T)    
 }
 
 # rownames(all.int.strength.matrix) <- gsub("GM12878|K562|HelaS3|Hepg2|H1hesc", "", toupper( gsub("K562b|Hepg2b", "B-",rownames(all.int.strength.matrix)) ), ignore.case=T)
@@ -226,7 +279,9 @@ if (nrow(all.int.strength.matrix) > 0) {
                num.breaks=255,
                clust.method="ward",
                break.lowerbound=1e6,
-               break.type="linear")
+               break.type="linear",
+               row.optimal.order=T,
+               col.optimal.order=T)
 }
 
 # rownames(global.pairwise.int.matrix) <- gsub("GM12878|K562|HelaS3|Hepg2|H1hesc", "", toupper( gsub("K562b|Hepg2b", "B-",rownames(global.pairwise.int.matrix)) ), ignore.case=T)
@@ -234,7 +289,7 @@ if (nrow(all.int.strength.matrix) > 0) {
 global.pairwise.int.matrix <- filter.cols(filter.rows(global.pairwise.int.matrix))
 rownames(global.pairwise.int.matrix) <- standardize.name(rownames(global.pairwise.int.matrix))
 colnames(global.pairwise.int.matrix) <- standardize.name(colnames(global.pairwise.int.matrix))
-
+global.pairwise.int.matrix <- global.pairwise.int.matrix[ rownames(global.pairwise.int.matrix), rownames(global.pairwise.int.matrix)]
 if (nrow(global.pairwise.int.matrix) > 0) {
 #   clust.results <- plot.heatmap(data=global.pairwise.int.matrix,
 #                show.dendro="none",
@@ -270,12 +325,13 @@ if (nrow(global.pairwise.int.matrix) > 0) {
                                 replace.diag=T,
                                 replace.na=T,
                                 num.breaks=255,
-                                clust.method="ward",
+                                clust.method="average",
                                 dist.metric="spearman",
-                                break.type="linear",
-                                break.lowerbound=10^4.5,
-                                #break.upperbound=1e-3
-                                )                 
+                                break.type="quantile",
+                                break.lowerbound=10^5,
+                                #break.upperbound=10^5.5,
+                                row.optimal.order=T,
+                                col.optimal.order=T)                 
 }
 
 # plot.heatmap(data=temp.matrix,row.cluster=F,col.cluster=F,
