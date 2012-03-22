@@ -2109,7 +2109,7 @@ get.average.cv <- function(rulefit.results) {
   return(rulefit.results)  
 }
 
-plot.average.vi <- function(rulefit.results, output.dir, output.filename=NA, ext="png", thresh=1) {
+plot.average.vi <- function(rulefit.results, output.dir, output.filename=NA, ext="pdf", thresh=1) {
   # ===================================
   # Plots variable importance from several random runs
   # Takes as input rulefit.results (list) OR
