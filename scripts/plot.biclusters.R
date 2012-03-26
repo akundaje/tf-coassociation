@@ -22,7 +22,7 @@ if (! file.exists(assoc.data.file)) {
   q(save="no",status=1)
 }
 
-output.file <- sprintf("%s.png",assoc.data.file)
+output.file <- sprintf("%s.pdf",assoc.data.file)
 if (nargs > 1) {
   output.file <- args[[2]] # Output File name
 }
@@ -59,8 +59,8 @@ clust.results <- plot.heatmap(t(assoc.data$assoc.matrix),
              filt.thresh=NA, 
              replace.diag=F, 
              break.type="linear",
-             clust.method=c("average","ward"),
-             dist.metric=c("pearson","euclidean"),
+             clust.method=c("ward","ward"),
+             dist.metric=c("euclidean","euclidean"),
              break.lowerbound=1e-4, # For TF-centric matrices
              break.upperbound=0.5,  # For TF-centric matrices
              #break.lowerbound=0.5, # For TF-centric matrices
