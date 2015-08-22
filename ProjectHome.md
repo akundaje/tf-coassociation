@@ -1,0 +1,1 @@
+Discriminative method for learning multivariate co-association patterns in genomics. e.g. Coassociation of transcription factors based on ChIP-seq data or coassociation of histone modifications. Based on the RuleFit algorithm by Friedman et al. 2004.
